@@ -396,6 +396,11 @@ canvas {
     }
     .modal { padding: 2rem; border-width: 2px; }
     .modal h1 { font-size: 3rem; }
-    .settings-bar { top: 10px; right: 10px; }
-    .toggle-btn { padding: 6px 10px; font-size: 0.8rem; }
+    .settings-bar { 
+        bottom: 10px; 
+        left: 10px; 
+        top: auto; 
+        right: auto; 
+        width: auto;
+    }
 }
