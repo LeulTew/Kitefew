@@ -140,6 +140,29 @@ const GuideModal: React.FC<{ onClose: () => void; lang: Language }> = ({ onClose
     );
 };
 
+// --- ABOUT MODAL ---
+const AboutModal: React.FC<{ onClose: () => void; lang: Language }> = ({ onClose, lang }) => {
+    return (
+        <div className="modal" style={{ zIndex: 100, maxWidth: '500px' }}>
+            <h1 style={{ fontSize: '2rem' }}>{t('about', lang)}</h1>
+
+            <div style={{ textAlign: 'left', margin: '2rem 0', background: 'var(--bg-secondary)', padding: '20px', borderRadius: '8px' }}>
+                <h3 style={{ color: 'var(--accent-color)', marginBottom: '15px' }}>{t('developer', lang)}</h3>
+                <p style={{ fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '10px' }}>{t('developerName', lang)}</p>
+
+                <h3 style={{ color: 'var(--accent-color)', marginTop: '20px', marginBottom: '10px' }}>{t('contact', lang)}</h3>
+                <ul style={{ listStyle: 'none', padding: 0, color: 'var(--text-muted)', lineHeight: '2' }}>
+                    <li>📧 <a href="mailto:Leulman2@gmail.com" style={{ color: 'var(--accent-color)' }}>Leulman2@gmail.com</a></li>
+                    <li>✈️ <a href="https://t.me/fabbin" style={{ color: 'var(--accent-color)' }}>@fabbin</a></li>
+                    <li>🐙 <a href="https://github.com/LeulTew" style={{ color: 'var(--accent-color)' }}>LeulTew</a></li>
+                </ul>
+            </div>
+
+            <MagneticButton onClick={onClose}>{t('gotIt', lang)}</MagneticButton>
+        </div>
+    );
+};
+
 // --- MAIN COMPONENT ---
 export const GameCanvas: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -150,7 +173,7 @@ export const GameCanvas: React.FC = () => {
     // State
     const [score, setScore] = useState(0);
     const [lives, setLives] = useState(3);
-    const [gameState, setGameState] = useState<'LOADING' | 'START' | 'ACTIVATING' | 'PLAYING' | 'GAMEOVER' | 'GUIDE'>('LOADING');
+    const [gameState, setGameState] = useState<'LOADING' | 'START' | 'ACTIVATING' | 'PLAYING' | 'GAMEOVER' | 'GUIDE' | 'ABOUT'>('LOADING');
     const [tracking, setTracking] = useState(false);
     const [highScore, setHighScore] = useState(0);
     const [streak, setStreak] = useState(0);
@@ -368,12 +391,16 @@ export const GameCanvas: React.FC = () => {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', alignItems: 'center' }}>
                             <MagneticButton onClick={activateCam}>{t('activateCam', lang)} <PlayIcon /></MagneticButton>
                             <MagneticButton onClick={() => setGameState('GUIDE')} secondary>{t('howToPlay', lang)} <HelpIcon /></MagneticButton>
+                            <MagneticButton onClick={() => setGameState('ABOUT')} secondary>{t('about', lang)}</MagneticButton>
                         </div>
                     )}
                 </div>
 
                 {/* Guide */}
                 {gameState === 'GUIDE' && <GuideModal onClose={() => setGameState('START')} lang={lang} />}
+
+                {/* About */}
+                {gameState === 'ABOUT' && <AboutModal onClose={() => setGameState('START')} lang={lang} />}
 
                 {/* Game Over */}
                 <div id="game-over-screen" className={`modal ${gameState === 'GAMEOVER' ? '' : 'hidden'}`}>

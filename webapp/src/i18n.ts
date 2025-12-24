@@ -50,6 +50,12 @@ export const translations = {
         // Controls
         stopGame: 'Stop Game',
         turnOffCamera: 'Turn Off Camera',
+
+        // About
+        about: 'About',
+        developer: 'Developer',
+        developerName: 'Leul Tewodros Agonafer',
+        contact: 'Contact',
     },
     am: {
         // Start Screen
@@ -98,6 +104,12 @@ export const translations = {
         // Controls
         stopGame: 'ጨዋታውን አቁም',
         turnOffCamera: 'ካሜራ አጥፋ',
+
+        // About
+        about: 'ስለ',
+        developer: 'ገንቢ',
+        developerName: 'ልኡል ቴዎድሮስ አጎናፈር',
+        contact: 'አድራሻ',
     }
 };
 
