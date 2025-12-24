@@ -43,7 +43,6 @@ export class MediaPipeService {
      * Process results with multi-hand selection and visibility filtering
      */
     private processResults(results: Results): void {
-        this.lostFrameCount = 0;
         if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
             const hand = results.multiHandLandmarks[0];
             const indexTip = hand[8];
