@@ -15,114 +15,68 @@ export class MediaPipeService {
 
     // Tracking state for smoothing
     private lastKnownPosition: { x: number; y: number } | null = null;
-    private lostFrameCount = 0;
-    private readonly MAX_LOST_FRAMES = 10; // Keep last position for 10 frames
 
     constructor(videoElement: HTMLVideoElement, onResultsCallback: (results: Results) => void) {
         this.videoElement = videoElement;
         this.onResultsCallback = onResultsCallback;
 
         this.hands = new Hands({
-            locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+            locateFile: (file) => {
+                return `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${file}`;
+            }
         });
 
         this.hands.setOptions({
-            // Allow 2 hands but we'll pick the best one
-            maxNumHands: 2,
-
-            // Higher complexity = better accuracy in poor conditions
-            // 0 = lite, 1 = full, 2 = full+ (most accurate but slower)
-            modelComplexity: 1,
-
-            // LOWERED for bad lighting - will detect hands even with low confidence
-            // Default is 0.5, we use 0.3 to catch hands in shadows/low light
-            minDetectionConfidence: 0.3,
-
-            // LOWERED for occlusion/visibility - keeps tracking even when partially hidden
-            // Default is 0.5, we use 0.3 to handle fingers going out of frame
-            minTrackingConfidence: 0.3
+            maxNumHands: 1, // Reduced to 1 for mobile performance
+            modelComplexity: 0, // Lite model for speed on mobile
+            minDetectionConfidence: 0.2, // Very forgiving
+            minTrackingConfidence: 0.2
         });
 
         this.hands.onResults((results) => this.processResults(results));
+
+        // Force initialization
+        this.hands.initialize().catch(e => console.error("MediaPipe Init Error:", e));
     }
 
     /**
      * Process results with multi-hand selection and visibility filtering
      */
     private processResults(results: Results): void {
+        this.lostFrameCount = 0;
         if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-            // If multiple hands, pick the one with best visibility
-            let bestHand = results.multiHandLandmarks[0];
-            let bestVisibility = this.calculateHandVisibility(results.multiHandLandmarks[0]);
-
-            for (let i = 1; i < results.multiHandLandmarks.length; i++) {
-                const visibility = this.calculateHandVisibility(results.multiHandLandmarks[i]);
-                if (visibility > bestVisibility) {
-                    bestVisibility = visibility;
-                    bestHand = results.multiHandLandmarks[i];
-                }
-            }
-
-            // Update position tracking
-            const indexTip = bestHand[8]; // Index finger tip
+            const hand = results.multiHandLandmarks[0];
+            const indexTip = hand[8];
             this.lastKnownPosition = { x: indexTip.x, y: indexTip.y };
-            this.lostFrameCount = 0;
 
-            // Forward the best hand's results
-            this.onResultsCallback({
-                ...results,
-                multiHandLandmarks: [bestHand],
-                multiHandedness: results.multiHandedness?.slice(0, 1)
-            } as Results);
+            this.onResultsCallback(results);
         } else {
-            // Hand lost - use interpolation for a few frames
-            this.lostFrameCount++;
-
-            if (this.lostFrameCount <= this.MAX_LOST_FRAMES && this.lastKnownPosition) {
-                // Create synthetic result with last known position
-                // This prevents jitter when hand is briefly occluded
-                this.onResultsCallback(results); // Still send empty for UI update
-            } else {
-                this.lastKnownPosition = null;
-                this.onResultsCallback(results);
+            // Use interpolation if available
+            if (this.lastKnownPosition) {
+                this.onResultsCallback(results); // Engine will handle hidden state
             }
         }
     }
 
-    /**
-     * Calculate average visibility score for a hand
-     * Higher = more visible/better tracking
-     */
-    private calculateHandVisibility(landmarks: Results['multiHandLandmarks'][0]): number {
-        // Focus on key points: wrist, thumb tip, index tip, middle tip
-        const keyPoints = [0, 4, 8, 12]; // wrist, thumb, index, middle
-        let totalVisibility = 0;
-        let count = 0;
-
-        for (const idx of keyPoints) {
-            if (landmarks[idx]) {
-                // Visibility is in z coordinate - closer to 0 = more visible
-                // We also check if point is within reasonable bounds
-                const point = landmarks[idx];
-                const inBounds = point.x >= 0 && point.x <= 1 && point.y >= 0 && point.y <= 1;
-                totalVisibility += inBounds ? 1 : 0;
-                count++;
-            }
-        }
-
-        return count > 0 ? totalVisibility / count : 0;
-    }
 
     async start() {
         if (this.camera) return;
 
+        // Use a lower resolution for mobile web performance
+        const isMobile = window.innerWidth < 768;
+        const width = isMobile ? 640 : 1280;
+        const height = isMobile ? 480 : 720;
+
         this.camera = new Camera(this.videoElement, {
             onFrame: async () => {
-                await this.hands.send({ image: this.videoElement });
+                try {
+                    await this.hands.send({ image: this.videoElement });
+                } catch (e) {
+                    console.error("Tracking Error:", e);
+                }
             },
-            // Higher resolution for better detection in poor lighting
-            width: 1280,
-            height: 720
+            width: width,
+            height: height
         });
 
         await this.camera.start();
@@ -132,7 +86,7 @@ export class MediaPipeService {
      * Get last known position even if hand is temporarily lost
      */
     getLastKnownPosition(): { x: number; y: number } | null {
-        return this.lostFrameCount <= this.MAX_LOST_FRAMES ? this.lastKnownPosition : null;
+        return this.lastKnownPosition;
     }
 
     async stop() {

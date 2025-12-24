@@ -16,5 +16,6 @@ Since you don't have Android Studio, I've set up **GitHub Actions** to build it 
 1.  Go to your repo: [https://github.com/LeulTew/Kitefew](https://github.com/LeulTew/Kitefew)
 2.  Click the **Actions** tab.
 3.  Click the **"Build Android APK"** workflow.
-4.  Once finished (green checkmark), click on it and look for the **Artifacts** section at the bottom.
+4.  Once finished (green checkmark), click on it and look for the **Art
+ifacts** section at the bottom.
 5.  Download **`app-debug.apk`**.
