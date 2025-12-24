@@ -179,6 +179,10 @@ export const GameCanvas: React.FC = () => {
     const [streak, setStreak] = useState(0);
     const [multiplier, setMultiplier] = useState(1);
     const [feedbacks, setFeedbacks] = useState<{ id: number, x: number, y: number, text: string }[]>([]);
+    const [debugLogs, setDebugLogs] = useState<string[]>([]);
+    const addLog = useCallback((msg: string) => {
+        setDebugLogs(prev => [...prev.slice(-4), msg]); // Keep last 5
+    }, []);
 
     // Settings
     const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -279,9 +283,15 @@ export const GameCanvas: React.FC = () => {
     const activateCam = async () => {
         setGameState('ACTIVATING');
         if (!mpRef.current && videoRef.current) {
-            mpRef.current = new MediaPipeService(videoRef.current, onResults);
+            mpRef.current = new MediaPipeService(videoRef.current, onResults, addLog);
             try { await mpRef.current.start(); }
-            catch (e) { alert("Camera error: " + (e as Error).message); setGameState('START'); return; }
+            catch (e) {
+                const err = (e as Error).message;
+                addLog('Start Error: ' + err);
+                alert("Camera error: " + err);
+                setGameState('START');
+                return;
+            }
         }
         setTimeout(() => { if (engineRef.current) { engineRef.current.startGame(); setGameState('PLAYING'); } }, 1000);
     };
@@ -344,7 +354,7 @@ export const GameCanvas: React.FC = () => {
                 <div id="tracking-label" style={{ background: tracking ? 'var(--accent-color)' : '#555' }}>
                     {tracking ? t('tracking', lang) : t('trackingOff', lang)}
                 </div>
-                <video ref={videoRef} id="input-video" playsInline></video>
+                <video ref={videoRef} id="input-video" playsInline muted autoPlay></video>
             </div>
 
             {/* UI Overlay */}
@@ -429,6 +439,17 @@ export const GameCanvas: React.FC = () => {
             <div id="loader" style={{ display: gameState === 'LOADING' ? 'block' : 'none' }}>
                 <div className="spinner"></div>
                 <div style={{ fontWeight: 700, letterSpacing: 1, marginTop: 10 }}>{t('loadingEngine', lang)}</div>
+            </div>
+
+            {/* DEBUG CONSOLE - Bottom Right */}
+            <div style={{
+                position: 'absolute', bottom: 50, right: 10,
+                background: 'rgba(0,0,0,0.7)', color: '#0f0',
+                fontSize: '10px', fontFamily: 'monospace',
+                padding: '5px', pointerEvents: 'none', zIndex: 9999,
+                maxWidth: '200px', display: 'flex', flexDirection: 'column'
+            }}>
+                {debugLogs.map((l, i) => <span key={i}>{l}</span>)}
             </div>
         </div>
     );

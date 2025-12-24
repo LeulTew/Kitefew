@@ -66,11 +66,13 @@ export class MediaPipeService {
         const width = isMobile ? 640 : 1280;
         const height = isMobile ? 480 : 720;
 
+        this.logger(`MediaPipeService: Starting camera with ${width}x${height}`);
         this.camera = new Camera(this.videoElement, {
             onFrame: async () => {
                 try {
                     await this.hands.send({ image: this.videoElement });
                 } catch (e) {
+                    this.logger(`MediaPipeService: Frame Error: ${e}`);
                     console.error("Tracking Error:", e);
                 }
             },
