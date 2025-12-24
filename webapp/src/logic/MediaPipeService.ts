@@ -12,31 +12,42 @@ export class MediaPipeService {
     camera: Camera | null = null;
     videoElement: HTMLVideoElement;
     onResultsCallback: (results: Results) => void;
+    private logger: (msg: string) => void;
 
     // Tracking state for smoothing
     private lastKnownPosition: { x: number; y: number } | null = null;
 
-    constructor(videoElement: HTMLVideoElement, onResultsCallback: (results: Results) => void) {
+    constructor(videoElement: HTMLVideoElement, onResultsCallback: (results: Results) => void, logger?: (msg: string) => void) {
         this.videoElement = videoElement;
         this.onResultsCallback = onResultsCallback;
+        this.logger = logger || console.log;
 
         this.hands = new Hands({
             locateFile: (file) => {
-                return `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${file}`;
+                const url = `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${file}`;
+                this.logger(`MediaPipeLoading: ${file}`);
+                return url;
             }
         });
 
         this.hands.setOptions({
-            maxNumHands: 1, // Reduced to 1 for mobile performance
-            modelComplexity: 0, // Lite model for speed on mobile
-            minDetectionConfidence: 0.2, // Very forgiving
+            maxNumHands: 1,
+            modelComplexity: 0,
+            minDetectionConfidence: 0.2,
             minTrackingConfidence: 0.2
         });
 
-        this.hands.onResults((results) => this.processResults(results));
+        this.hands.onResults((results) => {
+            // Sample log to prove it's alive (1% chance)
+            if (Math.random() < 0.01) this.logger("MediaPipe: Result OK");
+            this.processResults(results);
+        });
 
         // Force initialization
-        this.hands.initialize().catch(e => console.error("MediaPipe Init Error:", e));
+        this.logger("MediaPipeService: Calling hands.initialize()...");
+        this.hands.initialize()
+            .then(() => this.logger("MediaPipe: Init Success"))
+            .catch(e => this.logger(`MediaPipe: Init Fail ${e}`));
     }
 
     /**
