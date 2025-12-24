@@ -1,0 +1,9 @@
+node_modules
+dist
+.DS_Store
+.env
+.gemini
+.agent
+*.log
+android/
+ios/

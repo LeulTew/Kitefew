@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BOLD. // SLICE</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+
+    <!-- MediaPipe -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+    <style>
+        :root {
+            /* BOLD. Theme Variables */
+            --bg-color: #050505;
+            --text-color: #f2f2f2;
+            --accent-color: #ccff00; /* Acid Green */
+            --border-color: #333333;
+            --font-heading: 'Anton', sans-serif;
+            --font-body: 'Inter', sans-serif;
+            
+            /* Game Specific */
+            --heart-color: #ff2a55;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-body);
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        /* --- LAYOUT --- */
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 10;
+            cursor: none; /* We use our own reticle */
+        }
+
+        /* --- WEBCAM FEED (Styled like a BOLD element) --- */
+        #video-wrapper {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 180px;
+            height: 135px;
+            border: 2px solid var(--text-color);
+            background: #000;
+            z-index: 50;
+            overflow: hidden;
+            /* Make it look like a chunky frame */
+            box-shadow: 8px 8px 0px var(--accent-color); 
+            transition: transform 0.3s ease;
+        }
+        
+        #video-wrapper:hover {
+            transform: scale(1.05) translate(-5px, -5px);
+        }
+
+        #input-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1); /* Mirror */
+            opacity: 0.8;
+        }
+
+        /* Label for tracking status */
+        #tracking-label {
+            position: absolute;
+            top: -25px;
+            left: -2px;
+            background: var(--accent-color);
+            color: var(--bg-color);
+            font-family: var(--font-heading);
+            font-size: 0.8rem;
+            padding: 2px 8px;
+            text-transform: uppercase;
+            pointer-events: none;
+        }
+
+        /* --- UI LAYER --- */
+        #ui-layer {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 40;
+            pointer-events: none;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        /* --- HUD (Heads Up Display) --- */
+        .hud-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            mix-blend-mode: exclusion; /* Cool effect over canvas */
+        }
+
+        .score-block {
+            display: flex;
+            flex-direction: column;
+            pointer-events: auto;
+        }
+
+        .score-label {
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 0.5rem;
+            font-weight: 700;
+            color: var(--accent-color);
+        }
+
+        .score-value {
+            font-family: var(--font-heading);
+            font-size: 5rem;
+            line-height: 1;
+            color: var(--text-color);
+        }
+
+        .lives-block {
+            display: flex;
+            gap: 10px;
+        }
+
+        .heart-svg {
+            width: 30px;
+            height: 30px;
+            fill: var(--heart-color);
+            filter: drop-shadow(0 0 5px rgba(255, 42, 85, 0.5));
+            transition: transform 0.2s, opacity 0.2s;
+        }
+        .heart-svg.lost {
+            transform: scale(0);
+            opacity: 0;
+        }
+
+        /* --- MODALS (Start / Game Over) --- */
+        .modal {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 90%;
+            max-width: 600px;
+            background: var(--bg-color);
+            border: 3px solid var(--text-color);
+            padding: 4rem;
+            text-align: center;
+            pointer-events: auto;
+            z-index: 60;
+            /* Brutalist Shadow */
+            box-shadow: 15px 15px 0px var(--accent-color);
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+
+        .modal.hidden {
+            opacity: 0;
+            pointer-events: none;
+            transform: translate(-50%, -40%);
+        }
+
+        .modal h1 {
+            font-family: var(--font-heading);
+            font-size: clamp(3rem, 8vw, 6rem);
+            line-height: 0.9;
+            text-transform: uppercase;
+            margin-bottom: 1rem;
+            letter-spacing: -1px;
+        }
+        
+        .modal p {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #888;
+            margin-bottom: 3rem;
+            line-height: 1.6;
+        }
+
+        /* --- MAGNETIC BUTTON --- */
+        .cta-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+
+        .magnetic-btn {
+            background-color: var(--accent-color);
+            color: var(--bg-color);
+            padding: 1.2rem 3rem;
+            font-family: var(--font-heading);
+            font-size: 1.5rem;
+            text-transform: uppercase;
+            border: none;
+            cursor: pointer;
+            transition: transform 0.1s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            width: 100%;
+        }
+        
+        .magnetic-btn svg {
+            width: 24px; height: 24px;
+            transition: transform 0.3s;
+        }
+        
+        .cta-wrapper:hover .magnetic-btn svg {
+            transform: translateX(10px);
+        }
+
+        /* --- LOADING SPINNER --- */
+        #loader {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 70;
+            text-align: center;
+        }
+        .spinner {
+            width: 50px; height: 50px;
+            border: 4px solid #333;
+            border-top: 4px solid var(--accent-color);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 1rem auto;
+        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        /* --- FLOATING FEEDBACK --- */
+        .feedback-text {
+            position: absolute;
+            font-family: var(--font-heading);
+            font-size: 2rem;
+            text-transform: uppercase;
+            pointer-events: none;
+            animation: floatUp 0.8s forwards;
+            text-shadow: 2px 2px 0px #000;
+            z-index: 45;
+        }
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-50px) scale(1.2); }
+        }
+
+        /* --- MOBILE OPTIMIZATION --- */
+        @media (max-width: 768px) {
+            .score-value { font-size: 3.5rem; }
+            #video-wrapper { 
+                width: 120px; 
+                height: 90px; 
+                bottom: 10px; 
+                right: 10px; 
+                opacity: 0.6;
+            }
+            .modal { padding: 2rem; border-width: 2px; }
+            .modal h1 { font-size: 3rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <!-- Game Canvas -->
+        <canvas id="game-canvas"></canvas>
+
+        <!-- Webcam Feed (Styled Brutalist) -->
+        <div id="video-wrapper">
+            <div id="tracking-label">Tracking</div>
+            <video id="input-video" playsinline></video>
+        </div>
+
+        <!-- UI Overlay -->
+        <div id="ui-layer">
+            <div class="hud-top">
+                <div class="score-block">
+                    <span class="score-label">Score</span>
+                    <span id="score" class="score-value">0</span>
+                </div>
+                <div class="lives-block" id="lives">
+                    <!-- Hearts injected by JS -->
+                </div>
+            </div>
+
+            <!-- Start Screen Modal -->
+            <div id="start-screen" class="modal">
+                <h1>Bold.<br>Slice.</h1>
+                <p>Use your hand to cut. Do not touch the bombs.<br>High precision tracking enabled.</p>
+                
+                <div id="loading-ui" style="display:none; margin-bottom: 2rem;">
+                    <div class="spinner" style="width:30px; height:30px; border-width:3px;"></div>
+                </div>
+                
+                <div class="cta-wrapper" id="magnetic-start">
+                    <button id="start-btn" class="magnetic-btn">
+                        Activate Cam
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Game Over Modal -->
+            <div id="game-over-screen" class="modal hidden">
+                <h1>Game<br>Over</h1>
+                <p>Final Score: <span id="final-score" style="color:white; font-size:1.5rem;">0</span></p>
+                <div class="cta-wrapper" id="magnetic-restart">
+                    <button id="restart-btn" class="magnetic-btn">
+                        Try Again
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="loader">
+            <div class="spinner"></div>
+            <div style="font-weight:700; letter-spacing:1px; margin-top:10px;">LOADING ENGINE</div>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const CONFIG = {
+            gravity: 0.18,
+            spawnRate: 100, // Slower start
+            marginPercent: 0.12,
+            fruitRadius: 38,
+            bladeLife: 10,
+            bombChance: 0.1,
+            smoothingFactor: 0.3, // 0.1 (lazy) to 1.0 (instant)
+            hitboxPadding: 15,
+            colors: {
+                blade: '#ccff00', // Acid Green Blade
+                bladeGlow: 'rgba(204, 255, 0, 0.4)'
+            }
+        };
+
+        // --- GLOBAL STATE ---
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+        let score = 0;
+        let lives = 3;
+        let gameActive = false;
+        let frameCount = 0;
+        
+        let fruits = [];
+        let particles = [];
+        let bladeTrail = [];
+        
+        // Hand Tracking
+        let rawHand = { x: -100, y: -100, visible: false };
+        let smoothedHand = { x: -100, y: -100 };
+
+        // UI References
+        const scoreEl = document.getElementById('score');
+        const finalScoreEl = document.getElementById('final-score');
+        const livesContainer = document.getElementById('lives');
+        const startScreen = document.getElementById('start-screen');
+        const gameOverScreen = document.getElementById('game-over-screen');
+        const loader = document.getElementById('loader');
+        const startBtn = document.getElementById('start-btn');
+        const restartBtn = document.getElementById('restart-btn');
+        const trackingLabel = document.getElementById('tracking-label');
+
+        // Heart SVG
+        const heartSVG = `
+            <svg class="heart-svg" viewBox="0 0 24 24">
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+            </svg>`;
+
+        function updateLivesUI() {
+            livesContainer.innerHTML = '';
+            for(let i=0; i<lives; i++) livesContainer.innerHTML += heartSVG;
+        }
+        updateLivesUI();
+
+        // --- RESIZE & INIT ---
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        function lerp(start, end, amt) {
+            return (1 - amt) * start + amt * end;
+        }
+
+        // --- GAME CLASSES ---
+
+        class Fruit {
+            constructor() {
+                const margin = width * CONFIG.marginPercent;
+                const spawnWidth = width - (margin * 2);
+                this.x = margin + Math.random() * spawnWidth;
+                this.y = height + 50;
+                this.vx = (Math.random() - 0.5) * 3;
+                this.vy = -(Math.random() * 5 + 11);
+                this.rotation = Math.random() * Math.PI * 2;
+                this.rotSpeed = (Math.random() - 0.5) * 0.15;
+                this.radius = CONFIG.fruitRadius;
+                this.type = Math.random() < CONFIG.bombChance ? 'bomb' : this.getRandomType();
+                this.sliced = false;
+                this.active = true;
+            }
+
+            getRandomType() {
+                const types = ['apple', 'orange', 'watermelon', 'kiwi', 'lemon'];
+                return types[Math.floor(Math.random() * types.length)];
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vy += CONFIG.gravity;
+                this.rotation += this.rotSpeed;
+                if (this.y > height + 100 && this.vy > 0) {
+                    this.active = false;
+                    if (!this.sliced && this.type !== 'bomb' && gameActive) loseLife();
+                }
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rotation);
+
+                if (this.type === 'bomb') {
+                    // BOLD Bomb Design (High Contrast)
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = '#111';
+                    ctx.fill();
+                    ctx.lineWidth = 3;
+                    ctx.strokeStyle = '#fff';
+                    ctx.stroke();
+                    
+                    // Danger Cross
+                    ctx.beginPath();
+                    ctx.moveTo(-10, -10); ctx.lineTo(10, 10);
+                    ctx.moveTo(10, -10); ctx.lineTo(-10, 10);
+                    ctx.strokeStyle = '#ff2a55';
+                    ctx.lineWidth = 4;
+                    ctx.stroke();
+                } else {
+                    // High Detail Fruit
+                    this.drawFruitBody(ctx);
+                }
+                ctx.restore();
+            }
+
+            drawFruitBody(ctx) {
+                let grad = ctx.createRadialGradient(-8, -8, 5, 0, 0, this.radius);
+                if (this.type === 'apple') {
+                    grad.addColorStop(0, '#ff6b6b'); grad.addColorStop(1, '#c0392b');
+                } else if (this.type === 'orange') {
+                    grad.addColorStop(0, '#ffbe76'); grad.addColorStop(1, '#e67e22');
+                } else if (this.type === 'watermelon') {
+                    grad.addColorStop(0, '#58b819'); grad.addColorStop(1, '#218c13');
+                } else if (this.type === 'kiwi') {
+                    grad.addColorStop(0, '#a5d649'); grad.addColorStop(1, '#637a31');
+                } else if (this.type === 'lemon') {
+                    grad.addColorStop(0, '#fffacd'); grad.addColorStop(1, '#f1c40f');
+                }
+
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = grad;
+                ctx.fill();
+
+                // Specular Highlight (Glossy)
+                ctx.beginPath();
+                ctx.ellipse(-10, -10, 6, 10, Math.PI / 4, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                ctx.fill();
+
+                // Stem
+                ctx.beginPath();
+                ctx.moveTo(0, -this.radius + 2);
+                ctx.quadraticCurveTo(5, -this.radius - 8, 8, -this.radius);
+                ctx.strokeStyle = '#3e2723';
+                ctx.lineWidth = 3;
+                ctx.lineCap = 'round';
+                ctx.stroke();
+
+                // Leaf
+                if(['apple','watermelon'].includes(this.type)){
+                    ctx.fillStyle = '#4caf50';
+                    ctx.beginPath();
+                    ctx.ellipse(10, -this.radius, 8, 4, Math.PI/3, 0, Math.PI*2);
+                    ctx.fill();
+                }
+            }
+        }
+
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x; this.y = y;
+                this.color = color;
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 5 + 2;
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+                this.life = 1.0;
+                this.decay = Math.random() * 0.02 + 0.01;
+                this.size = Math.random() * 3 + 2;
+            }
+            update() {
+                this.x += this.vx; this.y += this.vy;
+                this.vy += CONFIG.gravity;
+                this.life -= this.decay;
+            }
+            draw(ctx) {
+                ctx.globalAlpha = Math.max(0, this.life);
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y, this.size, this.size); // Square particles for BOLD look
+                ctx.globalAlpha = 1.0;
+            }
+        }
+
+        // --- CORE LOGIC ---
+
+        function initGame() {
+            score = 0; lives = 3;
+            scoreEl.innerText = score;
+            updateLivesUI();
+            fruits = []; particles = []; bladeTrail = [];
+            gameActive = true; frameCount = 0;
+            smoothedHand = { x: width/2, y: height/2 };
+            
+            startScreen.classList.add('hidden');
+            gameOverScreen.classList.add('hidden');
+            lastTime = performance.now();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function gameOver() {
+            gameActive = false;
+            finalScoreEl.innerText = score;
+            gameOverScreen.classList.remove('hidden');
+        }
+
+        function loseLife() {
+            lives--;
+            updateLivesUI();
+            canvas.style.transform = `translate(${Math.random()*10-5}px, ${Math.random()*10-5}px)`;
+            setTimeout(() => canvas.style.transform = 'none', 100);
+            if(lives <= 0) gameOver();
+        }
+
+        function createSplash(x, y, type) {
+            let color = type === 'bomb' ? '#111' : '#ccff00'; // Splash is green for BOLD theme?
+            // Actually let's keep fruit colors for splash, but make particles squares
+            
+            if(type === 'apple') color = '#e74c3c';
+            if(type === 'orange') color = '#e67e22';
+            if(type === 'watermelon') color = '#c0392b';
+            if(type === 'kiwi') color = '#a5d649';
+            if(type === 'lemon') color = '#fff';
+
+            for(let i=0; i<10; i++) particles.push(new Particle(x, y, color));
+        }
+
+        function showFeedback(x, y, text) {
+            const el = document.createElement('div');
+            el.className = 'feedback-text';
+            el.innerText = text;
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
+            el.style.color = 'var(--accent-color)';
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 800);
+        }
+
+        // --- DRAWING HELPER (Tracking Reticle) ---
+        function drawTrackingReticle(ctx, x, y) {
+            if (!rawHand.visible) return;
+            
+            const size = 40;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.lineWidth = 2;
+            
+            // Crosshair lines
+            ctx.beginPath();
+            ctx.moveTo(x - size, y); ctx.lineTo(x + size, y);
+            ctx.moveTo(x, y - size); ctx.lineTo(x, y + size);
+            ctx.stroke();
+            
+            // Circle
+            ctx.beginPath();
+            ctx.arc(x, y, size/1.5, 0, Math.PI*2);
+            ctx.strokeStyle = 'var(--accent-color)';
+            ctx.stroke();
+        }
+
+        // --- GAME LOOP ---
+        function gameLoop(timestamp) {
+            if (!gameActive) return;
+
+            ctx.clearRect(0, 0, width, height);
+
+            // 1. Hand Smoothing
+            if (rawHand.visible) {
+                smoothedHand.x = lerp(smoothedHand.x, rawHand.x, CONFIG.smoothingFactor);
+                smoothedHand.y = lerp(smoothedHand.y, rawHand.y, CONFIG.smoothingFactor);
+            }
+
+            // 2. Draw Tracking Reticle (Visual Feedback for small screens)
+            drawTrackingReticle(ctx, smoothedHand.x, smoothedHand.y);
+
+            // 3. Blade Trail (BOLD Style)
+            if (rawHand.visible) {
+                bladeTrail.push({ x: smoothedHand.x, y: smoothedHand.y, age: 0 });
+                if (bladeTrail.length > 20) bladeTrail.shift();
+
+                // Draw Trail
+                if (bladeTrail.length > 1) {
+                    ctx.beginPath();
+                    ctx.moveTo(bladeTrail[0].x, bladeTrail[0].y);
+                    for(let i=1; i<bladeTrail.length; i++) {
+                        ctx.lineTo(bladeTrail[i].x, bladeTrail[i].y);
+                    }
+                    ctx.lineCap = 'square'; // BOLD caps
+                    ctx.lineJoin = 'miter';
+                    
+                    // Glow
+                    ctx.shadowBlur = 15;
+                    ctx.shadowColor = CONFIG.colors.blade;
+                    ctx.lineWidth = 10;
+                    ctx.strokeStyle = CONFIG.colors.bladeGlow;
+                    ctx.stroke();
+
+                    // Core
+                    ctx.shadowBlur = 0;
+                    ctx.lineWidth = 4;
+                    ctx.strokeStyle = CONFIG.colors.blade;
+                    ctx.stroke();
+                }
+            }
+
+            // 4. Spawning
+            frameCount++;
+            let currentRate = Math.max(50, CONFIG.spawnRate - Math.floor(score / 5));
+            if (frameCount % currentRate === 0) fruits.push(new Fruit());
+
+            // 5. Fruits Logic
+            fruits.sort((a, b) => a.y - b.y);
+            for (let i = fruits.length - 1; i >= 0; i--) {
+                const f = fruits[i];
+                f.update();
+                f.draw(ctx);
+
+                if (!f.sliced && f.active && rawHand.visible) {
+                    const dx = smoothedHand.x - f.x;
+                    const dy = smoothedHand.y - f.y;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    
+                    if (dist < f.radius + CONFIG.hitboxPadding) {
+                        const moveSpeed = Math.hypot(smoothedHand.x - bladeTrail[bladeTrail.length-2]?.x, smoothedHand.y - bladeTrail[bladeTrail.length-2]?.y);
+                        
+                        if (moveSpeed > 2) {
+                            if (f.type === 'bomb') {
+                                createSplash(f.x, f.y, 'bomb');
+                                gameOver();
+                            } else {
+                                f.sliced = true; f.active = false;
+                                createSplash(f.x, f.y, f.type);
+                                score++; scoreEl.innerText = score;
+                                showFeedback(f.x, f.y, "+1");
+                            }
+                        }
+                    }
+                }
+                if (!f.active) fruits.splice(i, 1);
+            }
+
+            // 6. Particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.update();
+                p.draw(ctx);
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // --- MEDIAPIPE ---
+        const videoElement = document.getElementById('input-video');
+
+        function onResults(results) {
+            loader.style.display = 'none';
+            trackingLabel.style.background = rawHand.visible ? 'var(--accent-color)' : '#555';
+            trackingLabel.innerText = rawHand.visible ? 'TRACKING' : 'SEARCHING';
+
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const indexTip = results.multiHandLandmarks[0][8];
+                rawHand.x = (1 - indexTip.x) * width;
+                rawHand.y = indexTip.y * height;
+                rawHand.visible = true;
+            } else {
+                rawHand.visible = false;
+            }
+        }
+
+        const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+        hands.onResults(onResults);
+
+        const camera = new Camera(videoElement, {
+            onFrame: async () => { await hands.send({image: videoElement}); },
+            width: 640, height: 480
+        });
+
+        // --- MAGNETIC BUTTON EFFECT ---
+        function initMagnetic(btnId, wrapperId) {
+            const wrapper = document.getElementById(wrapperId);
+            const btn = wrapper.querySelector('button');
+            
+            wrapper.addEventListener('mousemove', (e) => {
+                const rect = wrapper.getBoundingClientRect();
+                const x = e.clientX - rect.left - rect.width / 2;
+                const y = e.clientY - rect.top - rect.height / 2;
+                btn.style.transform = `translate(${x * 0.3}px, ${y * 0.3}px)`;
+            });
+            wrapper.addEventListener('mouseleave', () => {
+                btn.style.transform = 'translate(0px, 0px)';
+            });
+        }
+        initMagnetic('start-btn', 'magnetic-start');
+        initMagnetic('restart-btn', 'magnetic-restart');
+
+        // --- START ---
+        startBtn.addEventListener('click', async () => {
+            startBtn.style.display = 'none';
+            document.querySelector('#start-screen p').style.display = 'none';
+            document.getElementById('loading-ui').style.display = 'block';
+            
+            try {
+                await camera.start();
+                setTimeout(initGame, 1000);
+            } catch (e) {
+                alert("Camera error: " + e.message);
+            }
+        });
+
+        restartBtn.addEventListener('click', initGame);
+
+    </script>
+</body>
+</html>
