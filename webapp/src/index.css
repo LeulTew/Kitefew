@@ -7,7 +7,7 @@
     --accent-color: #ccff00; /* Acid Green */
     --border-color: #333333;
     --font-heading: 'Anton', sans-serif;
-    --font-body: 'Inter', sans-serif;
+    --font-body: 'Outfit', sans-serif;
     
     /* Game Specific */
     --heart-color: #ff2a55;
@@ -200,10 +200,16 @@ canvas {
 
 .modal p {
     font-size: 1.1rem;
-    font-weight: 600;
+    font-weight: 500;
     color: var(--text-muted);
     margin-bottom: 3rem;
     line-height: 1.6;
+    font-family: var(--font-body);
+}
+
+.modal h1, .modal h2, .modal h3 {
+    font-family: var(--font-heading);
+    text-transform: uppercase;
 }
 
 /* --- BUTTONS --- */

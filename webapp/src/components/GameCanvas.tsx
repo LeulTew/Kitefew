@@ -6,9 +6,10 @@ import { get, set } from 'idb-keyval';
 import { t, type Language } from '../i18n';
 
 // Images
-import guideGoodFrame from '../assets/guide_good_frame.webp';
-import guideBadFrame from '../assets/guide_bad_frame.webp';
-import guideGameplay from '../assets/guide_gameplay_action.webp';
+// Images (using absolute paths to ensure reliability on deployment)
+const guideGoodFrame = '/src/assets/guide_good_frame.webp';
+const guideBadFrame = '/src/assets/guide_bad_frame.webp';
+const guideGameplay = '/src/assets/guide_gameplay_action.webp';
 
 // --- PERSISTENCE HELPER ---
 const Persistence = {
@@ -106,27 +107,27 @@ const MagneticButton: React.FC<{ onClick: () => void; children: React.ReactNode;
 const GuideModal: React.FC<{ onClose: () => void; lang: Language }> = ({ onClose, lang }) => {
     return (
         <div className="modal" style={{ zIndex: 100, maxWidth: '800px', height: '80vh', overflowY: 'auto' }}>
-            <h1 style={{ fontSize: '2.5rem' }}>{t('guideTitle', lang)}</h1>
+            <h1>{t('guideTitle', lang)}</h1>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', margin: '2rem 0', textAlign: 'left' }}>
                 <div style={{ background: 'var(--bg-secondary)', padding: '15px', borderRadius: '8px' }}>
                     <img src={guideGoodFrame} alt="Good" loading="lazy" style={{ width: '100%', borderRadius: '4px', marginBottom: '10px' }} />
-                    <h3 style={{ color: '#4caf50', marginBottom: '5px' }}>{t('guideDo', lang)}</h3>
-                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{t('guideDoDesc', lang)}</p>
+                    <h2 style={{ color: '#4caf50', marginBottom: '5px', fontSize: '1.2rem' }}>{t('guideDo', lang)}</h2>
+                    <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: 0 }}>{t('guideDoDesc', lang)}</p>
                 </div>
 
                 <div style={{ background: 'var(--bg-secondary)', padding: '15px', borderRadius: '8px' }}>
                     <img src={guideBadFrame} alt="Bad" loading="lazy" style={{ width: '100%', borderRadius: '4px', marginBottom: '10px' }} />
-                    <h3 style={{ color: '#ff2a55', marginBottom: '5px' }}>{t('guideDont', lang)}</h3>
-                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{t('guideDontDesc', lang)}</p>
+                    <h2 style={{ color: '#ff2a55', marginBottom: '5px', fontSize: '1.2rem' }}>{t('guideDont', lang)}</h2>
+                    <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: 0 }}>{t('guideDontDesc', lang)}</p>
                 </div>
             </div>
 
             <div style={{ background: 'var(--bg-secondary)', padding: '20px', borderRadius: '8px', marginBottom: '2rem', textAlign: 'left', display: 'flex', gap: '20px', alignItems: 'center' }}>
                 <img src={guideGameplay} alt="Action" loading="lazy" style={{ width: '120px', borderRadius: '4px' }} />
                 <div>
-                    <h3 style={{ color: 'var(--accent-color)', marginBottom: '10px' }}>{t('guideRulesTitle', lang)}</h3>
-                    <ul style={{ listStyle: 'none', padding: 0, color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: '1.5' }}>
+                    <h2 style={{ color: 'var(--accent-color)', marginBottom: '10px', fontSize: '1.2rem' }}>{t('guideRulesTitle', lang)}</h2>
+                    <ul style={{ listStyle: 'none', padding: 0, color: 'var(--text-muted)', fontSize: '1rem', lineHeight: '1.5', fontFamily: 'var(--font-body)' }}>
                         <li>• {t('guideRule1', lang)}</li>
                         <li>• {t('guideRule2', lang)}</li>
                         <li>• {t('guideRule3', lang)}</li>
@@ -179,10 +180,6 @@ export const GameCanvas: React.FC = () => {
     const [streak, setStreak] = useState(0);
     const [multiplier, setMultiplier] = useState(1);
     const [feedbacks, setFeedbacks] = useState<{ id: number, x: number, y: number, text: string }[]>([]);
-    const [debugLogs, setDebugLogs] = useState<string[]>([]);
-    const addLog = useCallback((msg: string) => {
-        setDebugLogs(prev => [...prev.slice(-4), msg]); // Keep last 5
-    }, []);
 
     // Settings
     const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -281,21 +278,19 @@ export const GameCanvas: React.FC = () => {
 
         // Start asset downloads early
         if (!mpRef.current && videoRef.current) {
-            addLog("Warming up MediaPipe...");
-            mpRef.current = new MediaPipeService(videoRef.current, onResults, addLog);
+            mpRef.current = new MediaPipeService(videoRef.current, onResults);
         }
-    }, [onResults, addLog]);
+    }, [onResults]);
 
     const activateCam = async () => {
         setGameState('ACTIVATING');
         if (!mpRef.current && videoRef.current) {
-            mpRef.current = new MediaPipeService(videoRef.current, onResults, addLog);
+            mpRef.current = new MediaPipeService(videoRef.current, onResults);
             try {
                 await mpRef.current.start();
             }
             catch (e) {
                 const err = (e as Error).message;
-                addLog('Start Error: ' + err);
                 alert("Camera error: " + err);
                 setGameState('START');
                 return;
@@ -455,16 +450,6 @@ export const GameCanvas: React.FC = () => {
                 <div style={{ fontWeight: 700, letterSpacing: 1, marginTop: 10 }}>{t('loadingEngine', lang)}</div>
             </div>
 
-            {/* DEBUG CONSOLE - Bottom Right */}
-            <div style={{
-                position: 'absolute', bottom: 50, right: 10,
-                background: 'rgba(0,0,0,0.7)', color: '#0f0',
-                fontSize: '10px', fontFamily: 'monospace',
-                padding: '5px', pointerEvents: 'none', zIndex: 9999,
-                maxWidth: '200px', display: 'flex', flexDirection: 'column'
-            }}>
-                {debugLogs.map((l, i) => <span key={i}>{l}</span>)}
-            </div>
         </div>
     );
 };

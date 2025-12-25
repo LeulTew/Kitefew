@@ -37,8 +37,6 @@ export class MediaPipeService {
         });
 
         this.hands.onResults((results) => {
-            // Sample log to prove it's alive (1% chance)
-            if (Math.random() < 0.01) this.logger("MediaPipe: Result OK");
             this.processResults(results);
         });
 
