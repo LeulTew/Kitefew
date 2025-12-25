@@ -16,6 +16,7 @@ export class MediaPipeService {
 
     // Tracking state for smoothing
     private lastKnownPosition: { x: number; y: number } | null = null;
+    public initPromise: Promise<void>;
 
     constructor(videoElement: HTMLVideoElement, onResultsCallback: (results: Results) => void, logger?: (msg: string) => void) {
         this.videoElement = videoElement;
@@ -43,9 +44,14 @@ export class MediaPipeService {
 
         // Force initialization
         this.logger("MediaPipeService: Calling hands.initialize()...");
-        this.hands.initialize()
-            .then(() => this.logger("MediaPipe: Init Success"))
-            .catch(e => this.logger(`MediaPipe: Init Fail ${e}`));
+        this.initPromise = this.hands.initialize()
+            .then(() => {
+                this.logger("MediaPipe: Init Success");
+            })
+            .catch(e => {
+                this.logger(`MediaPipe: Init Fail ${e}`);
+                throw e;
+            });
     }
 
     /**
@@ -68,6 +74,7 @@ export class MediaPipeService {
 
 
     async start() {
+        await this.initPromise;
         if (this.camera) return;
 
         // Use a lower resolution for mobile web performance

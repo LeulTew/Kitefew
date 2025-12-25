@@ -188,17 +188,6 @@ export const GameCanvas: React.FC = () => {
     const [theme, setTheme] = useState<'dark' | 'light'>('dark');
     const [lang, setLang] = useState<Language>('en');
 
-    // Load settings - only on mount
-    useEffect(() => {
-        Persistence.load('theme').then(v => {
-            if (v) {
-                setTheme(v);
-                document.documentElement.setAttribute('data-theme', v);
-            }
-        });
-        Persistence.load('lang').then(v => { if (v) setLang(v); });
-    }, []);
-
     const toggleTheme = () => {
         const newTheme = theme === 'dark' ? 'light' : 'dark';
         setTheme(newTheme);
@@ -280,11 +269,30 @@ export const GameCanvas: React.FC = () => {
         }
     }, []);
 
+    // Load settings & Warm up MediaPipe
+    useEffect(() => {
+        Persistence.load('theme').then(v => {
+            if (v) {
+                setTheme(v);
+                document.documentElement.setAttribute('data-theme', v);
+            }
+        });
+        Persistence.load('lang').then(v => { if (v) setLang(v); });
+
+        // Start asset downloads early
+        if (!mpRef.current && videoRef.current) {
+            addLog("Warming up MediaPipe...");
+            mpRef.current = new MediaPipeService(videoRef.current, onResults, addLog);
+        }
+    }, [onResults, addLog]);
+
     const activateCam = async () => {
         setGameState('ACTIVATING');
         if (!mpRef.current && videoRef.current) {
             mpRef.current = new MediaPipeService(videoRef.current, onResults, addLog);
-            try { await mpRef.current.start(); }
+            try {
+                await mpRef.current.start();
+            }
             catch (e) {
                 const err = (e as Error).message;
                 addLog('Start Error: ' + err);
@@ -292,8 +300,14 @@ export const GameCanvas: React.FC = () => {
                 setGameState('START');
                 return;
             }
+        } else if (mpRef.current) {
+            await mpRef.current.start();
         }
-        setTimeout(() => { if (engineRef.current) { engineRef.current.startGame(); setGameState('PLAYING'); } }, 1000);
+
+        if (engineRef.current) {
+            engineRef.current.startGame();
+            setGameState('PLAYING');
+        }
     };
 
     const restartGame = () => {
