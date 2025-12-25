@@ -24,9 +24,7 @@ export class MediaPipeService {
 
         this.hands = new Hands({
             locateFile: (file) => {
-                const url = `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${file}`;
-                this.logger(`MediaPipeLoading: ${file}`);
-                return url;
+                return `/mediapipe/${file}`;
             }
         });
 
