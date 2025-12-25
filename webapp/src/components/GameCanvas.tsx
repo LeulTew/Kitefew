@@ -6,9 +6,9 @@ import { get, set } from 'idb-keyval';
 import { t, type Language } from '../i18n';
 
 // Images
-import guideGoodFrame from '../assets/guide_good_frame.png';
-import guideBadFrame from '../assets/guide_bad_frame.png';
-import guideGameplay from '../assets/guide_gameplay_action.png';
+import guideGoodFrame from '../assets/guide_good_frame.webp';
+import guideBadFrame from '../assets/guide_bad_frame.webp';
+import guideGameplay from '../assets/guide_gameplay_action.webp';
 
 // --- PERSISTENCE HELPER ---
 const Persistence = {
@@ -110,20 +110,20 @@ const GuideModal: React.FC<{ onClose: () => void; lang: Language }> = ({ onClose
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', margin: '2rem 0', textAlign: 'left' }}>
                 <div style={{ background: 'var(--bg-secondary)', padding: '15px', borderRadius: '8px' }}>
-                    <img src={guideGoodFrame} alt="Good" style={{ width: '100%', borderRadius: '4px', marginBottom: '10px' }} />
+                    <img src={guideGoodFrame} alt="Good" loading="lazy" style={{ width: '100%', borderRadius: '4px', marginBottom: '10px' }} />
                     <h3 style={{ color: '#4caf50', marginBottom: '5px' }}>{t('guideDo', lang)}</h3>
                     <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{t('guideDoDesc', lang)}</p>
                 </div>
 
                 <div style={{ background: 'var(--bg-secondary)', padding: '15px', borderRadius: '8px' }}>
-                    <img src={guideBadFrame} alt="Bad" style={{ width: '100%', borderRadius: '4px', marginBottom: '10px' }} />
+                    <img src={guideBadFrame} alt="Bad" loading="lazy" style={{ width: '100%', borderRadius: '4px', marginBottom: '10px' }} />
                     <h3 style={{ color: '#ff2a55', marginBottom: '5px' }}>{t('guideDont', lang)}</h3>
                     <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{t('guideDontDesc', lang)}</p>
                 </div>
             </div>
 
             <div style={{ background: 'var(--bg-secondary)', padding: '20px', borderRadius: '8px', marginBottom: '2rem', textAlign: 'left', display: 'flex', gap: '20px', alignItems: 'center' }}>
-                <img src={guideGameplay} alt="Action" style={{ width: '120px', borderRadius: '4px' }} />
+                <img src={guideGameplay} alt="Action" loading="lazy" style={{ width: '120px', borderRadius: '4px' }} />
                 <div>
                     <h3 style={{ color: 'var(--accent-color)', marginBottom: '10px' }}>{t('guideRulesTitle', lang)}</h3>
                     <ul style={{ listStyle: 'none', padding: 0, color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: '1.5' }}>
