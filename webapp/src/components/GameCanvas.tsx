@@ -129,7 +129,7 @@ const MagneticButton: React.FC<{ onClick: () => void; children: React.ReactNode;
 };
 
 // --- GUIDE MODAL ---
-const GuideModal: React.FC<{ onClose: () => void; lang: Language }> = ({ onClose, lang }) => {
+const GuideModal: React.FC<{ onClose: () => void; lang: Language; t: any }> = ({ onClose, lang, t }) => {
     return (
         <div className="modal" style={{ zIndex: 100, maxWidth: '800px', height: '80vh', overflowY: 'auto' }}>
             <h1>{t('guideTitle', lang)}</h1>
@@ -167,7 +167,7 @@ const GuideModal: React.FC<{ onClose: () => void; lang: Language }> = ({ onClose
 };
 
 // --- NAME ENTRY MODAL ---
-const NameEntryModal: React.FC<{ score: number, snapshot?: string, onSave: (name: string) => void, lang: Language, initialName: string }> = ({ score, snapshot, onSave, lang, initialName }) => {
+const NameEntryModal: React.FC<{ score: number, snapshot?: string, onSave: (name: string) => void, lang: Language, initialName: string, t: any }> = ({ score, snapshot, onSave, lang, initialName, t }) => {
     const [name, setName] = useState(initialName);
     return (
         <div className="modal" style={{ zIndex: 110 }}>
@@ -202,7 +202,7 @@ const NameEntryModal: React.FC<{ score: number, snapshot?: string, onSave: (name
 };
 
 // --- LEADERBOARD MODAL ---
-const LeaderboardModal: React.FC<{ data: any[], globalData: any[], onClose: () => void, lang: Language }> = ({ data, globalData, onClose, lang }) => {
+const LeaderboardModal: React.FC<{ data: any[], globalData: any[], onClose: () => void, lang: Language, t: any }> = ({ data, globalData, onClose, lang, t }) => {
     return (
         <div className="modal" style={{ zIndex: 100, maxWidth: '800px', maxHeight: '80vh', overflowY: 'auto' }}>
             <h1 style={{ fontSize: '3rem' }}>LEADERBOARD</h1>
@@ -267,7 +267,7 @@ const LeaderboardModal: React.FC<{ data: any[], globalData: any[], onClose: () =
 };
 
 // --- ABOUT MODAL ---
-const AboutModal: React.FC<{ onClose: () => void; lang: Language }> = ({ onClose, lang }) => {
+const AboutModal: React.FC<{ onClose: () => void; lang: Language; t: any }> = ({ onClose, lang, t }) => {
     return (
         <div className="modal" style={{ zIndex: 100, maxWidth: '500px' }}>
             <h1 style={{ fontSize: '2rem' }}>{t('about', lang)}</h1>
@@ -648,16 +648,16 @@ export const GameCanvas: React.FC = () => {
             </div>
 
             {/* Leaderboard */}
-            {showLeaderboard && <LeaderboardModal data={leaderboard} globalData={globalLeaderboard} onClose={() => setShowLeaderboard(false)} lang={lang} />}
+            {showLeaderboard && <LeaderboardModal data={leaderboard} globalData={globalLeaderboard} onClose={() => setShowLeaderboard(false)} lang={lang} t={t} />}
 
             {/* Name Entry */}
-            {showNameEntry && <NameEntryModal score={pendingScore} snapshot={pendingSnapshot} onSave={saveScore} lang={lang} initialName={playerName} />}
+            {showNameEntry && <NameEntryModal score={pendingScore} snapshot={pendingSnapshot} onSave={saveScore} lang={lang} initialName={playerName} t={t} />}
 
             {/* Guide */}
-            {gameState === 'GUIDE' && <GuideModal onClose={() => setGameState('START')} lang={lang} />}
+            {gameState === 'GUIDE' && <GuideModal onClose={() => setGameState('START')} lang={lang} t={t} />}
 
             {/* About */}
-            {gameState === 'ABOUT' && <AboutModal onClose={() => setGameState('START')} lang={lang} />}
+            {gameState === 'ABOUT' && <AboutModal onClose={() => setGameState('START')} lang={lang} t={t} />}
 
             {/* Game Over */}
             <div id="game-over-screen" className={`modal ${gameState === 'GAMEOVER' && !showNameEntry ? '' : 'hidden'}`}>
