@@ -1,5 +1,17 @@
 # React + TypeScript + Vite
 
+This project uses [Bun](https://bun.sh/) as the package manager. Please ensure you have Bun installed and use `bun` commands instead of `npm` or `yarn`.
+
+To install dependencies:
+```bash
+bun install
+```
+
+To run the development server:
+```bash
+bun run dev
+```
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:
