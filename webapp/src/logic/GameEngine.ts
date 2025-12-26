@@ -32,7 +32,7 @@ export class GameEngine {
     onSplash: (x: number, y: number, text: string) => void;
     onStreakUpdate: (streak: number, multiplier: number) => void;
 
-    private frameCount: number = 0;
+    private spawnTimer: number = 0;
 
     constructor(
         onScoreUpdate: (score: number) => void,
@@ -64,7 +64,7 @@ export class GameEngine {
         this.sparkles = [];
         this.bladeTrail = [];
         this.gameActive = true;
-        this.frameCount = 0;
+        this.spawnTimer = 0;
         this.smoothedHand = { x: this.width / 2, y: this.height / 2 };
 
         this.onScoreUpdate(this.score);
@@ -89,38 +89,39 @@ export class GameEngine {
         return 1;
     }
 
-    loop(ctx: CanvasRenderingContext2D) {
+    loop(ctx: CanvasRenderingContext2D, dt: number = 1.0) {
         if (!this.gameActive) return;
 
         ctx.clearRect(0, 0, this.width, this.height);
 
-        // 1. Hand Smoothing
+        // 1. Hand Smoothing - scale with dt
         if (this.rawHand.visible) {
-            this.smoothedHand.x = this.lerp(this.smoothedHand.x, this.rawHand.x, CONFIG.smoothingFactor);
-            this.smoothedHand.y = this.lerp(this.smoothedHand.y, this.rawHand.y, CONFIG.smoothingFactor);
+            const factor = 1 - Math.pow(1 - CONFIG.smoothingFactor, dt);
+            this.smoothedHand.x = this.lerp(this.smoothedHand.x, this.rawHand.x, factor);
+            this.smoothedHand.y = this.lerp(this.smoothedHand.y, this.rawHand.y, factor);
         }
 
         // 2. Enhanced Blade Trail
-        this.drawBlade(ctx);
+        this.drawBlade(ctx, dt);
 
         // 3. Spawning
-        this.handleSpawning();
+        this.handleSpawning(dt);
 
         // 4. Update & Draw Fruits
-        this.updateFruits(ctx);
+        this.updateFruits(ctx, dt);
 
         // 5. Particles & Sparkles
-        this.updateParticles(ctx);
+        this.updateParticles(ctx, dt);
     }
 
-    private drawBlade(ctx: CanvasRenderingContext2D) {
+    private drawBlade(ctx: CanvasRenderingContext2D, dt: number) {
         const now = Date.now();
 
         if (this.rawHand.visible) {
             this.bladeTrail.push({ x: this.smoothedHand.x, y: this.smoothedHand.y, time: now });
 
-            // Spawn sparkles along the trail
-            if (Math.random() > 0.7) {
+            // Spawn sparkles along the trail - scale probability with dt
+            if (Math.random() < 0.3 * dt) {
                 this.sparkles.push(new Sparkle(this.smoothedHand.x, this.smoothedHand.y));
             }
         }
@@ -176,11 +177,14 @@ export class GameEngine {
         }
     }
 
-    private handleSpawning() {
-        this.frameCount++;
+    private handleSpawning(dt: number) {
+        // Convert spawnRate (frames at 60fps) to time-based spawning
+        // 1 unit of dt approx 16.67ms
+        this.spawnTimer += dt;
         const currentRate = Math.max(40, CONFIG.spawnRate - Math.floor(this.score / 5));
 
-        if (this.frameCount % currentRate === 0) {
+        if (this.spawnTimer >= currentRate) {
+            this.spawnTimer = 0;
             // Check for double fruit spawn
             if (Math.random() < CONFIG.doubleFruitChance) {
                 const doubleFruits = spawnDoubleFruit(this.width, this.height);
@@ -191,10 +195,10 @@ export class GameEngine {
         }
     }
 
-    private updateFruits(ctx: CanvasRenderingContext2D) {
+    private updateFruits(ctx: CanvasRenderingContext2D, dt: number) {
         for (let i = this.fruits.length - 1; i >= 0; i--) {
             const f = this.fruits[i];
-            f.update(this.height);
+            f.update(this.height, dt);
             f.draw(ctx);
 
             // Missed fruit
@@ -306,11 +310,11 @@ export class GameEngine {
         }
     }
 
-    private updateParticles(ctx: CanvasRenderingContext2D) {
+    private updateParticles(ctx: CanvasRenderingContext2D, dt: number) {
         // Particles
         for (let i = this.particles.length - 1; i >= 0; i--) {
             const p = this.particles[i];
-            p.update();
+            p.update(dt);
             p.draw(ctx);
             if (p.life <= 0) this.particles.splice(i, 1);
         }
@@ -318,7 +322,7 @@ export class GameEngine {
         // Sparkles
         for (let i = this.sparkles.length - 1; i >= 0; i--) {
             const s = this.sparkles[i];
-            s.update();
+            s.update(dt);
             s.draw(ctx);
             if (s.life <= 0) this.sparkles.splice(i, 1);
         }

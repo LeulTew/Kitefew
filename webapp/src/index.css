@@ -215,7 +215,8 @@ canvas {
 /* --- BUTTONS --- */
 .cta-wrapper {
     position: relative;
-    display: inline-block;
+    display: block;
+    width: 100%;
 }
 
 .magnetic-btn {
@@ -256,6 +257,25 @@ canvas {
 .magnetic-btn.secondary:hover {
     background-color: var(--accent-color);
     color: var(--bg-color);
+}
+
+/* --- LEADERBOARD & INPUTS --- */
+input::placeholder {
+    color: var(--border-color);
+    opacity: 0.5;
+}
+
+input:focus {
+    border-color: var(--accent-color) !important;
+    box-shadow: 0 0 15px rgba(204, 255, 0, 0.2);
+}
+
+.leaderboard-snapshot {
+    width: 60px;
+    height: 40px;
+    border-radius: 4px;
+    object-fit: cover;
+    border: 1px solid var(--border-color);
 }
 
 /* --- THEME & LANG TOGGLE --- */

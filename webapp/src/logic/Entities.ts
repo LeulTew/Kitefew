@@ -25,12 +25,12 @@ export class Particle {
         this.size = Math.random() * 4 + 3;
     }
 
-    update() {
-        this.x += this.vx;
-        this.y += this.vy;
-        this.vy += CONFIG.gravity;
-        this.life -= this.decay;
-        this.vx *= 0.99; // Air resistance
+    update(dt: number = 1.0) {
+        this.x += this.vx * dt;
+        this.y += this.vy * dt;
+        this.vy += CONFIG.gravity * dt;
+        this.life -= this.decay * dt;
+        this.vx *= Math.pow(0.99, dt); // Air resistance compensation for delta time
     }
 
     draw(ctx: CanvasRenderingContext2D) {
@@ -67,8 +67,8 @@ export class Sparkle {
         this.size = Math.random() * 3 + 1;
     }
 
-    update() {
-        this.life -= 0.05;
+    update(dt: number = 1.0) {
+        this.life -= 0.05 * dt;
     }
 
     draw(ctx: CanvasRenderingContext2D) {
@@ -132,12 +132,12 @@ export class Fruit {
         return types[Math.floor(Math.random() * types.length)];
     }
 
-    update(fieldHeight: number) {
-        this.x += this.vx;
-        this.y += this.vy;
-        this.vy += CONFIG.gravity;
-        this.rotation += this.rotSpeed;
-        this.pulseTime += 0.1;
+    update(fieldHeight: number, dt: number = 1.0) {
+        this.x += this.vx * dt;
+        this.y += this.vy * dt;
+        this.vy += CONFIG.gravity * dt;
+        this.rotation += this.rotSpeed * dt;
+        this.pulseTime += 0.1 * dt;
 
         if (this.y > fieldHeight + 100 && this.vy > 0) {
             this.active = false;

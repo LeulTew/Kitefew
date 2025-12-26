@@ -141,6 +141,75 @@ const GuideModal: React.FC<{ onClose: () => void; lang: Language }> = ({ onClose
     );
 };
 
+// --- NAME ENTRY MODAL ---
+const NameEntryModal: React.FC<{ score: number, snapshot?: string, onSave: (name: string) => void, lang: Language, initialName: string }> = ({ score, snapshot, onSave, lang, initialName }) => {
+    const [name, setName] = useState(initialName);
+    return (
+        <div className="modal" style={{ zIndex: 110 }}>
+            <h1 style={{ fontSize: '3rem', color: 'var(--accent-color)' }}>{t('newHighScore', lang)}!</h1>
+            <p style={{ marginBottom: '1rem' }}>{t('finalScore', lang)}: {score}</p>
+
+            {snapshot && (
+                <div style={{ margin: '0 auto 2rem auto', width: '240px', border: '3px solid var(--accent-color)', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 0 20px rgba(204, 255, 0, 0.3)' }}>
+                    <img src={snapshot} alt="High Score Moment" style={{ width: '100%', display: 'block' }} />
+                </div>
+            )}
+
+            <div style={{ marginBottom: '2rem' }}>
+                <input
+                    type="text"
+                    placeholder={lang === 'en' ? "ENTER NAME" : "ስም ያስገቡ"}
+                    value={name}
+                    onChange={(e) => setName(e.target.value.toUpperCase())}
+                    style={{
+                        background: 'var(--bg-secondary)', border: '2px solid var(--border-color)', color: 'var(--text-color)',
+                        padding: '1rem', width: '100%', textAlign: 'center', fontSize: '1.5rem', fontFamily: 'var(--font-heading)',
+                        outline: 'none'
+                    }}
+                    autoFocus
+                    maxLength={15}
+                />
+            </div>
+
+            <MagneticButton onClick={() => onSave(name)}>{t('gotIt', lang)}</MagneticButton>
+        </div>
+    );
+};
+
+// --- LEADERBOARD MODAL ---
+const LeaderboardModal: React.FC<{ data: any[], onClose: () => void, lang: Language }> = ({ data, onClose, lang }) => {
+    return (
+        <div className="modal" style={{ zIndex: 100, maxWidth: '600px', maxHeight: '80vh', overflowY: 'auto' }}>
+            <h1 style={{ fontSize: '3rem' }}>LEADERBOARD</h1>
+            <div style={{ margin: '2rem 0' }}>
+                {data.length === 0 ? (
+                    <p>{lang === 'en' ? "No scores yet. Be the first!" : "ገና ነጥብ አልተመዘገበም። የመጀመሪያው ይሁኑ!"}</p>
+                ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {data.map((item, i) => (
+                            <div key={i} style={{
+                                display: 'flex', alignItems: 'center', background: 'var(--bg-secondary)',
+                                padding: '10px 20px', borderRadius: '8px', border: i === 0 ? '2px solid var(--accent-color)' : '1px solid var(--border-color)',
+                                gap: '15px'
+                            }}>
+                                <span style={{ fontFamily: 'var(--font-heading)', fontSize: '1.5rem', width: '30px', color: i < 3 ? 'var(--accent-color)' : 'var(--text-muted)' }}>{i + 1}</span>
+                                {item.snapshot && (
+                                    <div style={{ width: '60px', height: '40px', borderRadius: '4px', overflow: 'hidden', flexShrink: 0 }}>
+                                        <img src={item.snapshot} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    </div>
+                                )}
+                                <span style={{ flexGrow: 1, textAlign: 'left', fontWeight: 'bold' }}>{item.name}</span>
+                                <span style={{ fontFamily: 'var(--font-heading)', fontSize: '1.2rem', color: 'var(--accent-color)' }}>{item.score}</span>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+            <MagneticButton onClick={onClose}>{t('gotIt', lang)}</MagneticButton>
+        </div>
+    );
+};
+
 // --- ABOUT MODAL ---
 const AboutModal: React.FC<{ onClose: () => void; lang: Language }> = ({ onClose, lang }) => {
     return (
@@ -180,6 +249,12 @@ export const GameCanvas: React.FC = () => {
     const [streak, setStreak] = useState(0);
     const [multiplier, setMultiplier] = useState(1);
     const [feedbacks, setFeedbacks] = useState<{ id: number, x: number, y: number, text: string }[]>([]);
+    const [playerName, setPlayerName] = useState<string>('');
+    const [leaderboard, setLeaderboard] = useState<{ name: string, score: number, snapshot?: string }[]>([]);
+    const [showNameEntry, setShowNameEntry] = useState(false);
+    const [pendingScore, setPendingScore] = useState(0);
+    const [pendingSnapshot, setPendingSnapshot] = useState<string | undefined>(undefined);
+    const [showLeaderboard, setShowLeaderboard] = useState(false);
 
     // Settings
     const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -201,8 +276,30 @@ export const GameCanvas: React.FC = () => {
     const checkHighScore = useCallback((final: number) => {
         Persistence.load('highScore').then((val) => {
             const currentHigh = val ? (val as number) : 0;
-            if (final > currentHigh) { Persistence.save('highScore', final); setHighScore(final); }
+            if (final > currentHigh) {
+                Persistence.save('highScore', final);
+                setHighScore(final);
+
+                // Take snapshot
+                if (canvasRef.current) {
+                    const snap = canvasRef.current.toDataURL('image/webp', 0.5);
+                    setPendingSnapshot(snap);
+                }
+                setPendingScore(final);
+                setShowNameEntry(true);
+            }
         });
+
+        // Refresh leaderboard
+        Persistence.load('leaderboard').then((list) => {
+            if (list) setLeaderboard(list);
+        });
+    }, []);
+
+    // Load initial data
+    useEffect(() => {
+        Persistence.load('playerName').then(v => { if (v) setPlayerName(v); });
+        Persistence.load('leaderboard').then(v => { if (v) setLeaderboard(v || []); });
     }, []);
 
     const spawnFeedback = useCallback((x: number, y: number, text: string) => {
@@ -229,14 +326,24 @@ export const GameCanvas: React.FC = () => {
         engineRef.current = engine;
 
         let animationFrameId: number;
-        const render = () => {
+        let lastTimestamp: number = 0;
+
+        const render = (timestamp: number) => {
+            if (!lastTimestamp) lastTimestamp = timestamp;
+            const dt = (timestamp - lastTimestamp) / 16.67; // Normalize to 60fps (16.67ms/frame)
+            lastTimestamp = timestamp;
+
             if (canvasRef.current && engineRef.current) {
                 const ctx = canvasRef.current.getContext('2d');
-                if (ctx) engineRef.current.loop(ctx);
+                if (ctx) {
+                    // Cap dt to avoid massive jumps (like after switching tabs)
+                    const cappedDt = Math.min(dt, 5);
+                    engineRef.current.loop(ctx, cappedDt);
+                }
             }
             animationFrameId = requestAnimationFrame(render);
         };
-        render();
+        animationFrameId = requestAnimationFrame(render);
         setTimeout(() => setGameState('START'), 500);
         return () => cancelAnimationFrame(animationFrameId);
     }, [checkHighScore, spawnFeedback, updateStreak]);
@@ -319,6 +426,28 @@ export const GameCanvas: React.FC = () => {
         setLives(3);
     };
 
+    const saveScore = async (name: string) => {
+        if (!name.trim()) return;
+        const lowerName = name.trim().toLowerCase();
+
+        const existing = await Persistence.load('leaderboard') || [];
+        if (existing.some((e: any) => e.name.toLowerCase() === lowerName)) {
+            alert(lang === 'en' ? "Name already taken!" : "ስሙ ቀድሞ ተይዟል!");
+            return;
+        }
+
+        const newList = [...existing, { name: name.trim(), score: pendingScore, snapshot: pendingSnapshot }]
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 10);
+
+        await Persistence.save('leaderboard', newList);
+        await Persistence.save('playerName', name.trim());
+        setLeaderboard(newList);
+        setPlayerName(name.trim());
+        setShowNameEntry(false);
+        setGameState('START');
+    };
+
     const turnOffCamera = async () => {
         if (mpRef.current) {
             await mpRef.current.stop();
@@ -395,6 +524,7 @@ export const GameCanvas: React.FC = () => {
 
                 {/* Start Screen */}
                 <div id="start-screen" className={`modal ${gameState === 'START' || gameState === 'ACTIVATING' ? '' : 'hidden'}`}>
+                    {playerName && <div style={{ fontSize: '0.8rem', color: 'var(--accent-color)', marginBottom: '5px' }}>{lang === 'en' ? 'WELCOME BACK, ' : 'እንኳን ደህና መጡ፣ '}{playerName}</div>}
                     <h1 style={{ whiteSpace: 'pre-line' }}>{t('title', lang)}</h1>
                     <p style={{ display: gameState === 'ACTIVATING' ? 'none' : 'block' }}>
                         {t('subtitle', lang)}<br />
@@ -407,49 +537,56 @@ export const GameCanvas: React.FC = () => {
                     </div>
 
                     {gameState === 'START' && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', alignItems: 'center', width: '100%' }}>
                             <MagneticButton onClick={activateCam}>{t('activateCam', lang)} <PlayIcon /></MagneticButton>
-                            <MagneticButton onClick={() => setGameState('GUIDE')} secondary>{t('howToPlay', lang)} <HelpIcon /></MagneticButton>
+                            <div style={{ display: 'flex', gap: '15px', width: '100%' }}>
+                                <div style={{ flex: 1 }}><MagneticButton onClick={() => setGameState('GUIDE')} secondary>{t('howToPlay', lang)} <HelpIcon /></MagneticButton></div>
+                                <div style={{ width: '80px' }}><MagneticButton onClick={() => setShowLeaderboard(true)} secondary>🏆</MagneticButton></div>
+                            </div>
                             <MagneticButton onClick={() => setGameState('ABOUT')} secondary>{t('about', lang)}</MagneticButton>
                         </div>
                     )}
                 </div>
-
-                {/* Guide */}
-                {gameState === 'GUIDE' && <GuideModal onClose={() => setGameState('START')} lang={lang} />}
-
-                {/* About */}
-                {gameState === 'ABOUT' && <AboutModal onClose={() => setGameState('START')} lang={lang} />}
-
-                {/* Game Over */}
-                <div id="game-over-screen" className={`modal ${gameState === 'GAMEOVER' ? '' : 'hidden'}`}>
-                    <h1 style={{ whiteSpace: 'pre-line' }}>{t('gameOver', lang)}</h1>
-                    <p>
-                        {t('finalScore', lang)}: <span style={{ color: 'var(--text-color)', fontSize: '1.5rem' }}>{score}</span>
-                        {score > highScore && <span style={{ color: 'var(--accent-color)', display: 'block', marginTop: '0.5rem' }}>{t('newHighScore', lang)}</span>}
-                    </p>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', alignItems: 'center' }}>
-                        <MagneticButton onClick={restartGame}>{t('tryAgain', lang)} <RestartIcon /></MagneticButton>
-                        <MagneticButton onClick={turnOffCamera} secondary>{t('turnOffCamera', lang)} <CameraOffIcon /></MagneticButton>
-                    </div>
-                </div>
-
-                {/* Feedbacks */}
-                {feedbacks.map(f => (
-                    <div key={f.id} className="feedback-text" style={{
-                        left: f.x, top: f.y,
-                        color: f.text.includes('DOUBLE') || f.text.includes('TRIPLE') || f.text.includes('MEGA') ? '#FFD700' : f.text.includes('❤️') ? '#ff6b9d' : 'var(--accent-color)',
-                        fontSize: f.text.includes('MEGA') ? '2.5rem' : '2rem'
-                    }}>{f.text}</div>
-                ))}
             </div>
 
+            {/* Leaderboard */}
+            {showLeaderboard && <LeaderboardModal data={leaderboard} onClose={() => setShowLeaderboard(false)} lang={lang} />}
+
+            {/* Name Entry */}
+            {showNameEntry && <NameEntryModal score={pendingScore} snapshot={pendingSnapshot} onSave={saveScore} lang={lang} initialName={playerName} />}
+
+            {/* Guide */}
+            {gameState === 'GUIDE' && <GuideModal onClose={() => setGameState('START')} lang={lang} />}
+
+            {/* About */}
+            {gameState === 'ABOUT' && <AboutModal onClose={() => setGameState('START')} lang={lang} />}
+
+            {/* Game Over */}
+            <div id="game-over-screen" className={`modal ${gameState === 'GAMEOVER' && !showNameEntry ? '' : 'hidden'}`}>
+                <h1 style={{ whiteSpace: 'pre-line' }}>{t('gameOver', lang)}</h1>
+                <p>
+                    {t('finalScore', lang)}: <span style={{ color: 'var(--text-color)', fontSize: '1.5rem' }}>{score}</span>
+                    {score > highScore && <span style={{ color: 'var(--accent-color)', display: 'block', marginTop: '0.5rem' }}>{t('newHighScore', lang)}</span>}
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', alignItems: 'center' }}>
+                    <MagneticButton onClick={restartGame}>{t('tryAgain', lang)} <RestartIcon /></MagneticButton>
+                    <MagneticButton onClick={turnOffCamera} secondary>{t('turnOffCamera', lang)} <CameraOffIcon /></MagneticButton>
+                </div>
+            </div>
+
+            {/* Feedbacks */}
+            {feedbacks.map(f => (
+                <div key={f.id} className="feedback-text" style={{
+                    left: f.x, top: f.y,
+                    color: f.text.includes('DOUBLE') || f.text.includes('TRIPLE') || f.text.includes('MEGA') ? '#FFD700' : f.text.includes('❤️') ? '#ff6b9d' : 'var(--accent-color)',
+                    fontSize: f.text.includes('MEGA') ? '2.5rem' : '2rem'
+                }}>{f.text}</div>
+            ))}
             {/* Loader */}
             <div id="loader" style={{ display: gameState === 'LOADING' ? 'block' : 'none' }}>
                 <div className="spinner"></div>
                 <div style={{ fontWeight: 700, letterSpacing: 1, marginTop: 10 }}>{t('loadingEngine', lang)}</div>
             </div>
-
         </div>
     );
 };
