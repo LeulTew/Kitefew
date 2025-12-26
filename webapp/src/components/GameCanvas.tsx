@@ -177,33 +177,64 @@ const NameEntryModal: React.FC<{ score: number, snapshot?: string, onSave: (name
 };
 
 // --- LEADERBOARD MODAL ---
-const LeaderboardModal: React.FC<{ data: any[], onClose: () => void, lang: Language }> = ({ data, onClose, lang }) => {
+const LeaderboardModal: React.FC<{ data: any[], globalData: any[], onClose: () => void, lang: Language }> = ({ data, globalData, onClose, lang }) => {
     return (
-        <div className="modal" style={{ zIndex: 100, maxWidth: '600px', maxHeight: '80vh', overflowY: 'auto' }}>
+        <div className="modal" style={{ zIndex: 100, maxWidth: '800px', maxHeight: '80vh', overflowY: 'auto' }}>
             <h1 style={{ fontSize: '3rem' }}>LEADERBOARD</h1>
-            <div style={{ margin: '2rem 0' }}>
-                {data.length === 0 ? (
-                    <p>{lang === 'en' ? "No scores yet. Be the first!" : "ገና ነጥብ አልተመዘገበም። የመጀመሪያው ይሁኑ!"}</p>
-                ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        {data.map((item, i) => (
-                            <div key={i} style={{
-                                display: 'flex', alignItems: 'center', background: 'var(--bg-secondary)',
-                                padding: '10px 20px', borderRadius: '8px', border: i === 0 ? '2px solid var(--accent-color)' : '1px solid var(--border-color)',
-                                gap: '15px'
-                            }}>
-                                <span style={{ fontFamily: 'var(--font-heading)', fontSize: '1.5rem', width: '30px', color: i < 3 ? 'var(--accent-color)' : 'var(--text-muted)' }}>{i + 1}</span>
-                                {item.snapshot && (
-                                    <div style={{ width: '60px', height: '40px', borderRadius: '4px', overflow: 'hidden', flexShrink: 0 }}>
-                                        <img src={item.snapshot} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                    </div>
-                                )}
-                                <span style={{ flexGrow: 1, textAlign: 'left', fontWeight: 'bold' }}>{item.name}</span>
-                                <span style={{ fontFamily: 'var(--font-heading)', fontSize: '1.2rem', color: 'var(--accent-color)' }}>{item.score}</span>
-                            </div>
-                        ))}
-                    </div>
-                )}
+            <div style={{ margin: '2rem 0', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                {/* Local Leaderboard */}
+                <div>
+                    <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>{lang === 'en' ? 'LOCAL BEST' : 'አካባቢ ለምድ'}</h2>
+                    {data.length === 0 ? (
+                        <p>{lang === 'en' ? "No scores yet. Be the first!" : "ገና ነጥብ አልተመዘገበም። የመጀመሪያው ይሁኑ!"}</p>
+                    ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {data.map((item, i) => (
+                                <div key={i} style={{
+                                    display: 'flex', alignItems: 'center', background: 'var(--bg-secondary)',
+                                    padding: '10px 20px', borderRadius: '8px', border: i === 0 ? '2px solid var(--accent-color)' : '1px solid var(--border-color)',
+                                    gap: '15px'
+                                }}>
+                                    <span style={{ fontFamily: 'var(--font-heading)', fontSize: '1.5rem', width: '30px', color: i < 3 ? 'var(--accent-color)' : 'var(--text-muted)' }}>{i + 1}</span>
+                                    {item.snapshot && (
+                                        <div style={{ width: '60px', height: '40px', borderRadius: '4px', overflow: 'hidden', flexShrink: 0 }}>
+                                            <img src={item.snapshot} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                        </div>
+                                    )}
+                                    <span style={{ flexGrow: 1, textAlign: 'left', fontWeight: 'bold' }}>{item.name}</span>
+                                    <span style={{ fontFamily: 'var(--font-heading)', fontSize: '1.2rem', color: 'var(--accent-color)' }}>{item.score}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                {/* Global Leaderboard */}
+                <div>
+                    <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>{lang === 'en' ? 'GLOBAL BEST' : 'አለም አቀፍ ለምድ'}</h2>
+                    {globalData.length === 0 ? (
+                        <p>{lang === 'en' ? "Loading..." : "በመስቀል ላይ..."}</p>
+                    ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {globalData.map((item, i) => (
+                                <div key={i} style={{
+                                    display: 'flex', alignItems: 'center', background: 'var(--bg-secondary)',
+                                    padding: '10px 20px', borderRadius: '8px', border: i === 0 ? '2px solid var(--accent-color)' : '1px solid var(--border-color)',
+                                    gap: '15px'
+                                }}>
+                                    <span style={{ fontFamily: 'var(--font-heading)', fontSize: '1.5rem', width: '30px', color: i < 3 ? 'var(--accent-color)' : 'var(--text-muted)' }}>{i + 1}</span>
+                                    {item.snapshot && (
+                                        <div style={{ width: '60px', height: '40px', borderRadius: '4px', overflow: 'hidden', flexShrink: 0 }}>
+                                            <img src={item.snapshot} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                        </div>
+                                    )}
+                                    <span style={{ flexGrow: 1, textAlign: 'left', fontWeight: 'bold' }}>{item.name}</span>
+                                    <span style={{ fontFamily: 'var(--font-heading)', fontSize: '1.2rem', color: 'var(--accent-color)' }}>{item.score}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
             <MagneticButton onClick={onClose}>{t('gotIt', lang)}</MagneticButton>
         </div>
@@ -254,7 +285,7 @@ export const GameCanvas: React.FC = () => {
     const [showNameEntry, setShowNameEntry] = useState(false);
     const [pendingScore, setPendingScore] = useState(0);
     const [pendingSnapshot, setPendingSnapshot] = useState<string | undefined>(undefined);
-    const [showLeaderboard, setShowLeaderboard] = useState(false);
+    const [globalLeaderboard, setGlobalLeaderboard] = useState<{ name: string, score: number, snapshot?: string }[]>([]);
 
     // Settings
     const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -451,6 +482,22 @@ export const GameCanvas: React.FC = () => {
         await Persistence.save('playerName', name.trim());
         setLeaderboard(newList);
         setPlayerName(name.trim());
+
+        // Submit to global leaderboard
+        try {
+            const res = await fetch('/api/submit-score', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: name.trim(), score: pendingScore, snapshot: pendingSnapshot })
+            });
+            const result = await res.json();
+            if (!result.success) {
+                alert(lang === 'en' ? `Score not in top 50. Keep trying!` : `ነጥቡ ከአምስት ከፍተኛ አልተለመደም። ይሞክሩ!`);
+            }
+        } catch (e) {
+            console.error('Failed to submit to global leaderboard', e);
+        }
+
         setShowNameEntry(false);
         setGameState('START');
     };
@@ -464,6 +511,16 @@ export const GameCanvas: React.FC = () => {
         setTracking(false);
         setScore(0);
         setLives(3);
+    };
+
+    const fetchGlobal = async () => {
+        try {
+            const res = await fetch('/api/leaderboard');
+            const data = await res.json();
+            setGlobalLeaderboard(data.leaderboard);
+        } catch (e) {
+            console.error('Failed to fetch global leaderboard', e);
+        }
     };
 
     return (
@@ -557,7 +614,7 @@ export const GameCanvas: React.FC = () => {
                             <MagneticButton onClick={activateCam}>{t('activateCam', lang)} <PlayIcon /></MagneticButton>
                             <div style={{ display: 'flex', gap: '15px', width: '100%' }}>
                                 <div style={{ flex: 1 }}><MagneticButton onClick={() => setGameState('GUIDE')} secondary>{t('howToPlay', lang)} <HelpIcon /></MagneticButton></div>
-                                <div style={{ width: '80px' }}><MagneticButton onClick={() => setShowLeaderboard(true)} secondary>🏆</MagneticButton></div>
+                                <div style={{ width: '80px' }}><MagneticButton onClick={() => { fetchGlobal(); setShowLeaderboard(true); }} secondary>🏆</MagneticButton></div>
                             </div>
                             <MagneticButton onClick={() => setGameState('ABOUT')} secondary>{t('about', lang)}</MagneticButton>
                         </div>
@@ -566,7 +623,7 @@ export const GameCanvas: React.FC = () => {
             </div>
 
             {/* Leaderboard */}
-            {showLeaderboard && <LeaderboardModal data={leaderboard} onClose={() => setShowLeaderboard(false)} lang={lang} />}
+            {showLeaderboard && <LeaderboardModal data={leaderboard} globalData={globalLeaderboard} onClose={() => setShowLeaderboard(false)} lang={lang} />}
 
             {/* Name Entry */}
             {showNameEntry && <NameEntryModal score={pendingScore} snapshot={pendingSnapshot} onSave={saveScore} lang={lang} initialName={playerName} />}
