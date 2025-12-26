@@ -340,6 +340,7 @@ export const GameCanvas: React.FC = () => {
     const [pendingSnapshot, setPendingSnapshot] = useState<string | undefined>(undefined);
     const [globalLeaderboard, setGlobalLeaderboard] = useState<LeaderboardItem[]>([]);
     const [showLeaderboard, setShowLeaderboard] = useState(false);
+    const [cameraActive, setCameraActive] = useState(false);
 
     // Settings
     const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -487,6 +488,7 @@ export const GameCanvas: React.FC = () => {
             mpRef.current = new MediaPipeService(videoRef.current, onResults);
             try {
                 await mpRef.current.start();
+                setCameraActive(true);
             }
             catch (e) {
                 const err = (e as Error).message;
@@ -496,6 +498,7 @@ export const GameCanvas: React.FC = () => {
             }
         } else if (mpRef.current) {
             await mpRef.current.start();
+            setCameraActive(true);
         }
 
         if (engineRef.current) {
@@ -567,6 +570,7 @@ export const GameCanvas: React.FC = () => {
             await mpRef.current.stop();
             mpRef.current = null;
         }
+        setCameraActive(false);
         setGameState('START');
         setTracking(false);
         setScore(0);
@@ -618,7 +622,7 @@ export const GameCanvas: React.FC = () => {
             </div>
 
             {/* Camera Off Button - Bottom Hover */}
-            {gameState === 'START' && (
+            {(gameState === 'START' || gameState === 'ACTIVATING') && cameraActive && (
                 <div className="camera-off-hover">
                     <button className="small-btn" onClick={turnOffCamera}>
                         <CameraOffIcon /> {t('turnOffCamera', lang)}
@@ -682,6 +686,9 @@ export const GameCanvas: React.FC = () => {
                                 <div style={{ flex: 1 }}><MagneticButton onClick={() => setGameState('GUIDE')} secondary>{t('howToPlay', lang)} <HelpIcon /></MagneticButton></div>
                                 <div style={{ width: '80px' }}><MagneticButton onClick={() => { fetchGlobal(); setShowLeaderboard(true); }} secondary><TrophyIcon /></MagneticButton></div>
                             </div>
+                            {cameraActive && (
+                                <MagneticButton onClick={turnOffCamera} secondary>{t('turnOffCamera', lang)} <CameraOffIcon /></MagneticButton>
+                            )}
                             <MagneticButton onClick={() => setGameState('ABOUT')} secondary>{t('about', lang)}</MagneticButton>
                         </div>
                     )}
