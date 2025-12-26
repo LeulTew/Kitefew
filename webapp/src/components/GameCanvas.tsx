@@ -11,15 +11,20 @@ const guideGoodFrame = '/src/assets/guide_good_frame.webp';
 const guideBadFrame = '/src/assets/guide_bad_frame.webp';
 const guideGameplay = '/src/assets/guide_gameplay_action.webp';
 
+// --- TYPES ---
+type LeaderboardItem = { name: string; score: number; snapshot?: string };
+type TFunction = (key: keyof typeof import('../i18n').translations.en, lang: Language) => string;
+
 // --- PERSISTENCE HELPER ---
 const Persistence = {
-    async save(key: string, value: any) {
+    async save(key: string, value: unknown) {
         try { await set(key, value); }
-        catch { try { localStorage.setItem(key, JSON.stringify(value)); } catch { } }
+        catch { /* Silently fail */ }
     },
-    async load(key: string): Promise<any> {
-        try { const val = await get(key); if (val !== undefined) return val; } catch { }
-        try { const item = localStorage.getItem(key); return item ? JSON.parse(item) : undefined; } catch { return undefined; }
+    async load(key: string): Promise<unknown> {
+        try { const val = await get(key); if (val !== undefined) return val; } catch { /* Silently fail */ }
+        try { const item = localStorage.getItem(key); return item ? JSON.parse(item) : undefined; } catch { /* Silently fail */ }
+        return undefined;
     }
 };
 
@@ -129,7 +134,7 @@ const MagneticButton: React.FC<{ onClick: () => void; children: React.ReactNode;
 };
 
 // --- GUIDE MODAL ---
-const GuideModal: React.FC<{ onClose: () => void; lang: Language; t: any }> = ({ onClose, lang, t }) => {
+const GuideModal: React.FC<{ onClose: () => void; lang: Language; t: TFunction }> = ({ onClose, lang, t }) => {
     return (
         <div className="modal" style={{ zIndex: 100, maxWidth: '800px', height: '80vh', overflowY: 'auto' }}>
             <h1>{t('guideTitle', lang)}</h1>
@@ -167,7 +172,7 @@ const GuideModal: React.FC<{ onClose: () => void; lang: Language; t: any }> = ({
 };
 
 // --- NAME ENTRY MODAL ---
-const NameEntryModal: React.FC<{ score: number, snapshot?: string, onSave: (name: string) => void, lang: Language, initialName: string, t: any }> = ({ score, snapshot, onSave, lang, initialName, t }) => {
+const NameEntryModal: React.FC<{ score: number, snapshot?: string, onSave: (name: string) => void, lang: Language, initialName: string, t: TFunction }> = ({ score, snapshot, onSave, lang, initialName, t }) => {
     const [name, setName] = useState(initialName);
     return (
         <div className="modal" style={{ zIndex: 110 }}>
@@ -202,7 +207,7 @@ const NameEntryModal: React.FC<{ score: number, snapshot?: string, onSave: (name
 };
 
 // --- LEADERBOARD MODAL ---
-const LeaderboardModal: React.FC<{ data: any[], globalData: any[], onClose: () => void, lang: Language, t: any }> = ({ data, globalData, onClose, lang, t }) => {
+const LeaderboardModal: React.FC<{ data: LeaderboardItem[], globalData: LeaderboardItem[], onClose: () => void, lang: Language, t: TFunction }> = ({ data, globalData, onClose, lang, t }) => {
     return (
         <div className="modal" style={{ zIndex: 100, maxWidth: '800px', maxHeight: '80vh', overflowY: 'auto' }}>
             <h1 style={{ fontSize: '3rem' }}>LEADERBOARD</h1>
@@ -250,8 +255,8 @@ const LeaderboardModal: React.FC<{ data: any[], globalData: any[], onClose: () =
                                     <span style={{ fontFamily: 'var(--font-heading)', fontSize: '1.5rem', width: '30px', color: i < 3 ? 'var(--accent-color)' : 'var(--text-muted)' }}>{i + 1}</span>
                                     {item.snapshot && (
                                         <div style={{ width: '60px', height: '40px', borderRadius: '4px', overflow: 'hidden', flexShrink: 0 }}>
-                                            <img src={item.snapshot} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                        </div>
+                                        <img src={item.snapshot} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                    </div>
                                     )}
                                     <span style={{ flexGrow: 1, textAlign: 'left', fontWeight: 'bold' }}>{item.name}</span>
                                     <span style={{ fontFamily: 'var(--font-heading)', fontSize: '1.2rem', color: 'var(--accent-color)' }}>{item.score}</span>
@@ -267,7 +272,7 @@ const LeaderboardModal: React.FC<{ data: any[], globalData: any[], onClose: () =
 };
 
 // --- ABOUT MODAL ---
-const AboutModal: React.FC<{ onClose: () => void; lang: Language; t: any }> = ({ onClose, lang, t }) => {
+const AboutModal: React.FC<{ onClose: () => void; lang: Language; t: TFunction }> = ({ onClose, lang, t }) => {
     return (
         <div className="modal" style={{ zIndex: 100, maxWidth: '500px' }}>
             <h1 style={{ fontSize: '2rem' }}>{t('about', lang)}</h1>
@@ -306,11 +311,12 @@ export const GameCanvas: React.FC = () => {
     const [multiplier, setMultiplier] = useState(1);
     const [feedbacks, setFeedbacks] = useState<{ id: number, x: number, y: number, text: string }[]>([]);
     const [playerName, setPlayerName] = useState<string>('');
-    const [leaderboard, setLeaderboard] = useState<{ name: string, score: number, snapshot?: string }[]>([]);
+    const [leaderboard, setLeaderboard] = useState<LeaderboardItem[]>([]);
     const [showNameEntry, setShowNameEntry] = useState(false);
     const [pendingScore, setPendingScore] = useState(0);
     const [pendingSnapshot, setPendingSnapshot] = useState<string | undefined>(undefined);
-    const [globalLeaderboard, setGlobalLeaderboard] = useState<{ name: string, score: number, snapshot?: string }[]>([]);
+    const [globalLeaderboard, setGlobalLeaderboard] = useState<LeaderboardItem[]>([]);
+    const [showLeaderboard, setShowLeaderboard] = useState(false);
 
     // Settings
     const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -331,7 +337,7 @@ export const GameCanvas: React.FC = () => {
 
     const checkHighScore = useCallback((final: number) => {
         Persistence.load('highScore').then((val) => {
-            const currentHigh = val ? (val as number) : 0;
+            const currentHigh = typeof val === 'number' ? val : 0;
             if (final > currentHigh) {
                 Persistence.save('highScore', final);
                 setHighScore(final);
@@ -355,14 +361,14 @@ export const GameCanvas: React.FC = () => {
 
         // Refresh leaderboard
         Persistence.load('leaderboard').then((list) => {
-            if (list) setLeaderboard(list);
+            if (Array.isArray(list)) setLeaderboard(list as LeaderboardItem[]);
         });
     }, []);
 
     // Load initial data
     useEffect(() => {
-        Persistence.load('playerName').then(v => { if (v) setPlayerName(v); });
-        Persistence.load('leaderboard').then(v => { if (v) setLeaderboard(v || []); });
+        Persistence.load('playerName').then(v => { if (typeof v === 'string') setPlayerName(v); });
+        Persistence.load('leaderboard').then(v => { if (Array.isArray(v)) setLeaderboard(v as LeaderboardItem[]); });
     }, []);
 
     const spawnFeedback = useCallback((x: number, y: number, text: string) => {
@@ -377,7 +383,7 @@ export const GameCanvas: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        Persistence.load('highScore').then((val) => { if (val) setHighScore(val as number); });
+        Persistence.load('highScore').then((val) => { if (typeof val === 'number') setHighScore(val); });
 
         const engine = new GameEngine(
             (s) => setScore(s),
@@ -439,12 +445,12 @@ export const GameCanvas: React.FC = () => {
     // Load settings & Warm up MediaPipe
     useEffect(() => {
         Persistence.load('theme').then(v => {
-            if (v) {
+            if (typeof v === 'string' && (v === 'dark' || v === 'light')) {
                 setTheme(v);
                 document.documentElement.setAttribute('data-theme', v);
             }
         });
-        Persistence.load('lang').then(v => { if (v) setLang(v); });
+        Persistence.load('lang').then(v => { if (typeof v === 'string' && (v === 'en' || v === 'am')) setLang(v); });
 
         // Start asset downloads early
         if (!mpRef.current && videoRef.current) {
@@ -494,7 +500,7 @@ export const GameCanvas: React.FC = () => {
         const lowerName = name.trim().toLowerCase();
 
         const existing = await Persistence.load('leaderboard') || [];
-        if (existing.some((e: any) => e.name.toLowerCase() === lowerName)) {
+        if (!Array.isArray(existing) || existing.some((e: LeaderboardItem) => typeof e.name === 'string' && e.name.toLowerCase() === lowerName)) {
             alert(lang === 'en' ? "Name already taken!" : "ስሙ ቀድሞ ተይዟል!");
             return;
         }
