@@ -410,7 +410,22 @@ input:focus {
 }
 
 
-/* --- MOBILE OPTIMIZATION --- */
+/* --- CAMERA OFF HOVER --- */
+.camera-off-hover {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+}
+
+.camera-off-hover:hover {
+    opacity: 1;
+    pointer-events: auto;
+}
 @media (max-width: 768px) {
     .score-value { font-size: 3.5rem; }
     #video-wrapper { 

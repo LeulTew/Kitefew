@@ -280,10 +280,17 @@ export const GameCanvas: React.FC = () => {
                 Persistence.save('highScore', final);
                 setHighScore(final);
 
-                // Take snapshot
-                if (canvasRef.current) {
-                    const snap = canvasRef.current.toDataURL('image/webp', 0.5);
-                    setPendingSnapshot(snap);
+                // Take snapshot from video
+                if (videoRef.current) {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    if (ctx) {
+                        canvas.width = videoRef.current.videoWidth;
+                        canvas.height = videoRef.current.videoHeight;
+                        ctx.drawImage(videoRef.current, 0, 0);
+                        const snap = canvas.toDataURL('image/webp', 0.5);
+                        setPendingSnapshot(snap);
+                    }
                 }
                 setPendingScore(final);
                 setShowNameEntry(true);
@@ -486,6 +493,15 @@ export const GameCanvas: React.FC = () => {
                     {lang === 'en' ? 'አማ' : 'EN'}
                 </button>
             </div>
+
+            {/* Camera Off Button - Bottom Hover */}
+            {gameState === 'START' && (
+                <div className="camera-off-hover">
+                    <button className="small-btn" onClick={turnOffCamera}>
+                        <CameraOffIcon /> {t('turnOffCamera', lang)}
+                    </button>
+                </div>
+            )}
 
             {/* Webcam */}
             <div id="video-wrapper">
