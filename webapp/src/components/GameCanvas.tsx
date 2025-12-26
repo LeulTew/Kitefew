@@ -110,11 +110,12 @@ const TrophyIcon = () => (
 );
 
 // --- MAGNETIC BUTTON ---
-const MagneticButton: React.FC<{ onClick: () => void; children: React.ReactNode; secondary?: boolean; }> = ({ onClick, children, secondary }) => {
+const MagneticButton: React.FC<{ onClick: () => void; children: React.ReactNode; secondary?: boolean; disabled?: boolean; }> = ({ onClick, children, secondary, disabled }) => {
     const wrapperRef = useRef<HTMLDivElement>(null);
     const buttonRef = useRef<HTMLButtonElement>(null);
 
     const handleMouseMove = (e: React.MouseEvent) => {
+        if (disabled) return;
         if (!wrapperRef.current || !buttonRef.current) return;
         const rect = wrapperRef.current.getBoundingClientRect();
         const x = e.clientX - rect.left - rect.width / 2;
@@ -122,11 +123,14 @@ const MagneticButton: React.FC<{ onClick: () => void; children: React.ReactNode;
         buttonRef.current.style.transform = `translate(${x * 0.3}px, ${y * 0.3}px)`;
     };
 
-    const handleMouseLeave = () => { if (buttonRef.current) buttonRef.current.style.transform = 'translate(0,0)'; };
+    const handleMouseLeave = () => {
+        if (disabled) return;
+        if (buttonRef.current) buttonRef.current.style.transform = 'translate(0,0)';
+    };
 
     return (
         <div ref={wrapperRef} className="cta-wrapper" onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}>
-            <button ref={buttonRef} className={`magnetic-btn ${secondary ? 'secondary' : ''}`} onClick={onClick}>
+            <button ref={buttonRef} className={`magnetic-btn ${secondary ? 'secondary' : ''} ${disabled ? 'disabled' : ''}`} onClick={disabled ? undefined : onClick} disabled={disabled}>
                 {children}
             </button>
         </div>
@@ -174,6 +178,21 @@ const GuideModal: React.FC<{ onClose: () => void; lang: Language; t: TFunction }
 // --- NAME ENTRY MODAL ---
 const NameEntryModal: React.FC<{ score: number, snapshot?: string, onSave: (name: string) => void, lang: Language, initialName: string, t: TFunction }> = ({ score, snapshot, onSave, lang, initialName, t }) => {
     const [name, setName] = useState(initialName);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const handleSubmit = () => {
+        if (name.trim() && !isSubmitting) {
+            setIsSubmitting(true);
+            onSave(name.trim());
+        }
+    };
+
+    const handleKeyPress = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            handleSubmit();
+        }
+    };
+
     return (
         <div className="modal" style={{ zIndex: 110 }}>
             <h1 style={{ fontSize: '3rem', color: 'var(--accent-color)' }}>{t('newHighScore', lang)}!</h1>
@@ -191,6 +210,7 @@ const NameEntryModal: React.FC<{ score: number, snapshot?: string, onSave: (name
                     placeholder={lang === 'en' ? "ENTER NAME" : "ስም ያስገቡ"}
                     value={name}
                     onChange={(e) => setName(e.target.value.toUpperCase())}
+                    onKeyPress={handleKeyPress}
                     style={{
                         background: 'var(--bg-secondary)', border: '2px solid var(--border-color)', color: 'var(--text-color)',
                         padding: '1rem', width: '100%', textAlign: 'center', fontSize: '1.5rem', fontFamily: 'var(--font-heading)',
@@ -198,10 +218,13 @@ const NameEntryModal: React.FC<{ score: number, snapshot?: string, onSave: (name
                     }}
                     autoFocus
                     maxLength={15}
+                    disabled={isSubmitting}
                 />
             </div>
 
-            <MagneticButton onClick={() => onSave(name)}>{t('gotIt', lang)}</MagneticButton>
+            <MagneticButton onClick={handleSubmit} disabled={isSubmitting}>
+                {isSubmitting ? (lang === 'en' ? 'SUBMITTING...' : 'በመስጠት ላይ...') : t('gotIt', lang)}
+            </MagneticButton>
         </div>
     );
 };
@@ -500,7 +523,9 @@ export const GameCanvas: React.FC = () => {
         const lowerName = name.trim().toLowerCase();
 
         const existing = await Persistence.load('leaderboard') || [];
-        if (!Array.isArray(existing) || existing.some((e: LeaderboardItem) => typeof e.name === 'string' && e.name.toLowerCase() === lowerName)) {
+        const isExistingUser = playerName && playerName.toLowerCase() === lowerName;
+
+        if (!Array.isArray(existing) || (!isExistingUser && existing.some((e: LeaderboardItem) => typeof e.name === 'string' && e.name.toLowerCase() === lowerName))) {
             alert(lang === 'en' ? "Name already taken!" : "ስሙ ቀድሞ ተይዟል!");
             return;
         }
@@ -521,12 +546,16 @@ export const GameCanvas: React.FC = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name: name.trim(), score: pendingScore, snapshot: pendingSnapshot })
             });
-            const result = await res.json();
-            if (!result.success) {
-                alert(lang === 'en' ? `Score not in top 50. Keep trying!` : `ነጥቡ ከአምስት ከፍተኛ አልተለመደም። ይሞክሩ!`);
+            if (res.ok) {
+                const result = await res.json();
+                if (!result.success) {
+                    console.warn('Score not in top 50. Keep trying!');
+                }
+            } else {
+                console.warn('Global leaderboard submission failed (API error)');
             }
-        } catch (e) {
-            console.error('Failed to submit to global leaderboard', e);
+        } catch {
+            console.warn('Global leaderboard submission failed (network error)');
         }
 
         setShowNameEntry(false);
@@ -547,10 +576,16 @@ export const GameCanvas: React.FC = () => {
     const fetchGlobal = async () => {
         try {
             const res = await fetch('/api/leaderboard');
+            if (!res.ok) {
+                console.warn('Global leaderboard not available (API returned error)');
+                setGlobalLeaderboard([]);
+                return;
+            }
             const data = await res.json();
-            setGlobalLeaderboard(data.leaderboard);
-        } catch (e) {
-            console.error('Failed to fetch global leaderboard', e);
+            setGlobalLeaderboard(data.leaderboard || []);
+        } catch {
+            console.warn('Global leaderboard not available (network error)');
+            setGlobalLeaderboard([]);
         }
     };
 
