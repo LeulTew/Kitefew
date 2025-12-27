@@ -21,10 +21,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await redis.connect();
 
     // Check if leaderboard is empty and add default user if needed
-    const leaderboardSize = await redis.sendCommand(['ZCARD', 'leaderboard']);
-    if (Number(leaderboardSize) === 0) {
-      await redis.sendCommand(['ZADD', 'leaderboard', '5', 'Torpi']);
-      await redis.sendCommand(['HSET', 'leaderboard:data', 'Torpi', JSON.stringify({ score: 5, snapshot: undefined })]);
+    const leaderboardSize = await redis.ZCARD('leaderboard');
+    if (leaderboardSize === 0) {
+      await redis.ZADD('leaderboard', { score: 5, value: 'Torpi' });
+      await redis.HSET('leaderboard:data', 'Torpi', JSON.stringify({ score: 5, snapshot: undefined }));
     }
 
     const top50 = await redis.sendCommand(['ZREVRANGE', 'leaderboard', '0', '49']);
@@ -33,7 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       for (let i = 0; i < top50.length; i++) {
         const name = top50[i];
         if (typeof name === 'string') {
-          const data = await redis.sendCommand(['HGET', 'leaderboard:data', name]);
+          const data = await redis.HGET('leaderboard:data', name);
           if (data && typeof data === 'string') {
             try {
               const parsed = JSON.parse(data);

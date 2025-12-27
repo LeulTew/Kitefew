@@ -52,11 +52,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Add to leaderboard
-    await redis.sendCommand(['ZADD', 'leaderboard', score.toString(), name]);
+    await redis.ZADD('leaderboard', { score, value: name });
     const rank = await redis.sendCommand(['ZREVRANK', 'leaderboard', name]);
-    const rankNumber = typeof rank === 'number' ? rank : null;
-    const isTop3 = rankNumber !== null && rankNumber < 3;
-    await redis.sendCommand(['HSET', 'leaderboard:data', name, JSON.stringify({ score, snapshot: isTop3 ? snapshot : undefined })]);
+    const isTop3 = rank !== null && typeof rank === 'number' && rank < 3;
+    await redis.HSET('leaderboard:data', name, JSON.stringify({ score, snapshot: isTop3 ? snapshot : undefined }));
 
     // Trim to top 50
     await redis.sendCommand(['ZREMRANGEBYRANK', 'leaderboard', '0', '-51']);
@@ -76,7 +75,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     await redis.disconnect();
-    res.status(200).json({ message: 'Score submitted', success: true, rank: rankNumber ? rankNumber + 1 : null });
+    const rankNumber = typeof rank === 'number' ? rank + 1 : null;
+    res.status(200).json({ message: 'Score submitted', success: true, rank: rankNumber });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Internal server error' });

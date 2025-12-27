@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "redis": "^5.10.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.3"
+  }
+}
