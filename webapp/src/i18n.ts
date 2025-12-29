@@ -114,5 +114,6 @@ export const translations = {
 };
 
 export function t(key: keyof typeof translations.en, lang: Language = 'en'): string {
-    return translations[lang][key] || translations.en[key] || key;
+    const dict = translations[lang] || translations.en;
+    return dict[key] || translations.en[key] || key;
 }

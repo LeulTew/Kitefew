@@ -53,30 +53,60 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Add to leaderboard
     await redis.sendCommand(['ZADD', 'leaderboard', score.toString(), name]);
-    const rank = await redis.sendCommand(['ZREVRANK', 'leaderboard', name]);
-    const rankNumber = typeof rank === 'number' ? rank : null;
-    const isTop3 = rankNumber !== null && rankNumber < 3;
-    await redis.sendCommand(['HSET', 'leaderboard:data', name, JSON.stringify({ score, snapshot: isTop3 ? snapshot : undefined })]);
-
+    
     // Trim to top 50
     await redis.sendCommand(['ZREMRANGEBYRANK', 'leaderboard', '0', '-51']);
+    
+    // Get current top 50 to sync data and enforce top-3 snapshot rule
     const currentTop50 = await redis.sendCommand(['ZREVRANGE', 'leaderboard', '0', '49']);
+    
     if (Array.isArray(currentTop50)) {
-      const allData = await redis.sendCommand(['HGETALL', 'leaderboard:data']);
       const toKeep = new Set(currentTop50);
+      const allData = await redis.sendCommand(['HGETALL', 'leaderboard:data']);
+      let nameHandled = false;
+      
       if (Array.isArray(allData)) {
-        // HGETALL returns [key1, value1, key2, value2, ...]
         for (let i = 0; i < allData.length; i += 2) {
           const key = allData[i];
-          if (typeof key === 'string' && !toKeep.has(key)) {
-            await redis.sendCommand(['HDEL', 'leaderboard:data', key]);
+          const val = allData[i+1];
+          if (typeof key === 'string' && typeof val === 'string') {
+            if (!toKeep.has(key)) {
+              await redis.sendCommand(['HDEL', 'leaderboard:data', key]);
+            } else {
+              const rank = currentTop50.indexOf(key);
+              const parsed = JSON.parse(val);
+              let changed = false;
+
+              if (key === name) {
+                parsed.score = score;
+                if (rank < 3 && snapshot) parsed.snapshot = snapshot;
+                else if (rank >= 3) parsed.snapshot = undefined;
+                changed = true;
+                nameHandled = true;
+              } else if (rank >= 3 && parsed.snapshot) {
+                parsed.snapshot = undefined;
+                changed = true;
+              }
+
+              if (changed) {
+                await redis.sendCommand(['HSET', 'leaderboard:data', key, JSON.stringify(parsed)]);
+              }
+            }
           }
         }
+      }
+      
+      if (!nameHandled && toKeep.has(name)) {
+        const rank = currentTop50.indexOf(name);
+        await redis.sendCommand(['HSET', 'leaderboard:data', name, JSON.stringify({ 
+          score, 
+          snapshot: (rank !== -1 && rank < 3) ? snapshot : undefined 
+        })]);
       }
     }
 
     await redis.disconnect();
-    res.status(200).json({ message: 'Score submitted', success: true, rank: rankNumber ? rankNumber + 1 : null });
+    res.status(200).json({ message: 'Score submitted', success: true });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Internal server error' });

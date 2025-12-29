@@ -5,11 +5,10 @@ import type { Results } from '@mediapipe/hands';
 import { get, set } from 'idb-keyval';
 import { t, type Language } from '../i18n';
 
-// Images
-// Images (using absolute paths to ensure reliability on deployment)
-const guideGoodFrame = '/src/assets/guide_good_frame.webp';
-const guideBadFrame = '/src/assets/guide_bad_frame.webp';
-const guideGameplay = '/src/assets/guide_gameplay_action.webp';
+// Images - Using static imports for Vite bundling
+import guideGoodFrame from '../assets/guide_good_frame.webp';
+import guideBadFrame from '../assets/guide_bad_frame.webp';
+import guideGameplay from '../assets/guide_gameplay_action.webp';
 
 // --- TYPES ---
 type LeaderboardItem = { name: string; score: number; snapshot?: string };
@@ -87,13 +86,13 @@ const ArrowUpIcon = () => (
 // --- NEW ICONS ---
 const TelegramIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" width="20" height="20">
-        <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+        <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
     </svg>
 );
 
 const GithubIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" width="20" height="20">
-        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
     </svg>
 );
 
@@ -104,8 +103,9 @@ const EmailIcon = () => (
 );
 
 const TrophyIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="32" height="32">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+    <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" width="32" height="32" style={{ minWidth: '32px', minHeight: '32px' }}>
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15.93c-3.95-.49-7-3.85-7-7.93h2c0 3.31 2.69 6 6 6v2zm1-4.93c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm6.07 4.93v-2c.99 0 1.93-.15 2.83-.42-.63 1.1-1.16 1.85-1.83 2.42H18.07z" />
+        <path d="M19 4h-2V3a1 1 0 00-1-1H8a1 1 0 00-1 1v1H5a2 2 0 00-2 2v3a4 4 0 004 4h.28c.35.6.76 1.15 1.22 1.63L8 18.36V20h8v-1.64l-.5-3.73c.46-.48.87-1.03 1.22-1.63H17a4 4 0 004-4V6a2 2 0 00-2-2zM7 9V6H5v3a2 2 0 002 2v-.17A4.98 4.98 0 016.07 9H7zm14 0a2 2 0 01-2 2v.17A4.98 4.98 0 0117.93 9H19V6h-.17c.11.32.17.65.17 1v2z" />
     </svg>
 );
 
@@ -140,28 +140,28 @@ const MagneticButton: React.FC<{ onClick: () => void; children: React.ReactNode;
 // --- GUIDE MODAL ---
 const GuideModal: React.FC<{ onClose: () => void; lang: Language; t: TFunction }> = ({ onClose, lang, t }) => {
     return (
-        <div className="modal" style={{ zIndex: 100, maxWidth: '800px', height: '80vh', overflowY: 'auto' }}>
+        <div className="modal" style={{ zIndex: 100, maxWidth: '700px', maxHeight: '85vh', overflowY: 'auto' }}>
             <h1>{t('guideTitle', lang)}</h1>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', margin: '2rem 0', textAlign: 'left' }}>
-                <div style={{ background: 'var(--bg-secondary)', padding: '15px', borderRadius: '8px' }}>
-                    <img src={guideGoodFrame} alt="Good" loading="lazy" style={{ width: '100%', borderRadius: '4px', marginBottom: '10px' }} />
-                    <h2 style={{ color: '#4caf50', marginBottom: '5px', fontSize: '1.2rem' }}>{t('guideDo', lang)}</h2>
-                    <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: 0 }}>{t('guideDoDesc', lang)}</p>
+            <div className="guide-grid">
+                <div style={{ background: 'var(--bg-secondary)', padding: '12px', borderRadius: '8px' }}>
+                    <img src={guideGoodFrame} alt="Good" loading="lazy" style={{ width: '100%', borderRadius: '4px', marginBottom: '8px' }} />
+                    <h2 style={{ color: '#4caf50', marginBottom: '5px', fontSize: '1.1rem' }}>{t('guideDo', lang)}</h2>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 0 }}>{t('guideDoDesc', lang)}</p>
                 </div>
 
-                <div style={{ background: 'var(--bg-secondary)', padding: '15px', borderRadius: '8px' }}>
-                    <img src={guideBadFrame} alt="Bad" loading="lazy" style={{ width: '100%', borderRadius: '4px', marginBottom: '10px' }} />
-                    <h2 style={{ color: '#ff2a55', marginBottom: '5px', fontSize: '1.2rem' }}>{t('guideDont', lang)}</h2>
-                    <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: 0 }}>{t('guideDontDesc', lang)}</p>
+                <div style={{ background: 'var(--bg-secondary)', padding: '12px', borderRadius: '8px' }}>
+                    <img src={guideBadFrame} alt="Bad" loading="lazy" style={{ width: '100%', borderRadius: '4px', marginBottom: '8px' }} />
+                    <h2 style={{ color: '#ff2a55', marginBottom: '5px', fontSize: '1.1rem' }}>{t('guideDont', lang)}</h2>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 0 }}>{t('guideDontDesc', lang)}</p>
                 </div>
             </div>
 
-            <div style={{ background: 'var(--bg-secondary)', padding: '20px', borderRadius: '8px', marginBottom: '2rem', textAlign: 'left', display: 'flex', gap: '20px', alignItems: 'center' }}>
-                <img src={guideGameplay} alt="Action" loading="lazy" style={{ width: '120px', borderRadius: '4px' }} />
+            <div className="guide-rules-section">
+                <img src={guideGameplay} alt="Action" loading="lazy" />
                 <div>
-                    <h2 style={{ color: 'var(--accent-color)', marginBottom: '10px', fontSize: '1.2rem' }}>{t('guideRulesTitle', lang)}</h2>
-                    <ul style={{ listStyle: 'none', padding: 0, color: 'var(--text-muted)', fontSize: '1rem', lineHeight: '1.5', fontFamily: 'var(--font-body)' }}>
+                    <h2 style={{ color: 'var(--accent-color)', marginBottom: '8px', fontSize: '1.1rem' }}>{t('guideRulesTitle', lang)}</h2>
+                    <ul style={{ listStyle: 'none', padding: 0, color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: '1.4', fontFamily: 'var(--font-body)' }}>
                         <li>• {t('guideRule1', lang)}</li>
                         <li>• {t('guideRule2', lang)}</li>
                         <li>• {t('guideRule3', lang)}</li>
@@ -232,12 +232,24 @@ const NameEntryModal: React.FC<{ score: number, snapshot?: string, onSave: (name
 // --- LEADERBOARD MODAL ---
 const LeaderboardModal: React.FC<{ data: LeaderboardItem[], globalData: LeaderboardItem[], onClose: () => void, lang: Language, t: TFunction }> = ({ data, globalData, onClose, lang, t }) => {
     return (
-        <div className="modal" style={{ zIndex: 100, maxWidth: '800px', maxHeight: '80vh', overflowY: 'auto' }}>
-            <h1 style={{ fontSize: '3rem' }}>LEADERBOARD</h1>
-            <div style={{ margin: '2rem 0', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                {/* Local Leaderboard */}
-                <div>
-                    <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>{lang === 'en' ? 'LOCAL BEST' : 'አካባቢ ለምድ'}</h2>
+        <div className="modal" style={{ zIndex: 100, maxWidth: '900px', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+            <h1 style={{ fontSize: '3rem', marginBottom: '1rem', flexShrink: 0 }}>LEADERBOARD</h1>
+
+            <div style={{
+                flexGrow: 1,
+                overflowY: 'auto',
+                margin: '1rem 0',
+                paddingRight: '10px',
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '30px',
+                minHeight: 0 // Important for nested flex scroll
+            }}>
+                {/* Home Leaderboard */}
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem', position: 'sticky', top: 0, background: 'var(--bg-primary)', padding: '10px 0', zIndex: 5 }}>
+                        {lang === 'en' ? 'HOME BEST' : 'የቤት ምርጥ'}
+                    </h2>
                     {data.length === 0 ? (
                         <p>{lang === 'en' ? "No scores yet. Be the first!" : "ገና ነጥብ አልተመዘገበም። የመጀመሪያው ይሁኑ!"}</p>
                     ) : (
@@ -254,7 +266,7 @@ const LeaderboardModal: React.FC<{ data: LeaderboardItem[], globalData: Leaderbo
                                             <img src={item.snapshot} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                         </div>
                                     )}
-                                    <span style={{ flexGrow: 1, textAlign: 'left', fontWeight: 'bold' }}>{item.name}</span>
+                                    <span style={{ flexGrow: 1, textAlign: 'left', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</span>
                                     <span style={{ fontFamily: 'var(--font-heading)', fontSize: '1.2rem', color: 'var(--accent-color)' }}>{item.score}</span>
                                 </div>
                             ))}
@@ -263,8 +275,10 @@ const LeaderboardModal: React.FC<{ data: LeaderboardItem[], globalData: Leaderbo
                 </div>
 
                 {/* Global Leaderboard */}
-                <div>
-                    <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>{lang === 'en' ? 'GLOBAL BEST' : 'አለም አቀፍ ለምድ'}</h2>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem', position: 'sticky', top: 0, background: 'var(--bg-primary)', padding: '10px 0', zIndex: 5 }}>
+                        {lang === 'en' ? 'GLOBAL BEST' : 'አለም አቀፍ ምርጥ'}
+                    </h2>
                     {globalData.length === 0 ? (
                         <p>{lang === 'en' ? "Loading..." : "በመስቀል ላይ..."}</p>
                     ) : (
@@ -278,10 +292,10 @@ const LeaderboardModal: React.FC<{ data: LeaderboardItem[], globalData: Leaderbo
                                     <span style={{ fontFamily: 'var(--font-heading)', fontSize: '1.5rem', width: '30px', color: i < 3 ? 'var(--accent-color)' : 'var(--text-muted)' }}>{i + 1}</span>
                                     {item.snapshot && (
                                         <div style={{ width: '60px', height: '40px', borderRadius: '4px', overflow: 'hidden', flexShrink: 0 }}>
-                                        <img src={item.snapshot} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                    </div>
+                                            <img src={item.snapshot} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                        </div>
                                     )}
-                                    <span style={{ flexGrow: 1, textAlign: 'left', fontWeight: 'bold' }}>{item.name}</span>
+                                    <span style={{ flexGrow: 1, textAlign: 'left', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</span>
                                     <span style={{ fontFamily: 'var(--font-heading)', fontSize: '1.2rem', color: 'var(--accent-color)' }}>{item.score}</span>
                                 </div>
                             ))}
@@ -289,7 +303,10 @@ const LeaderboardModal: React.FC<{ data: LeaderboardItem[], globalData: Leaderbo
                     )}
                 </div>
             </div>
-            <MagneticButton onClick={onClose}>{t('gotIt', lang)}</MagneticButton>
+
+            <div style={{ flexShrink: 0, marginTop: '1rem' }}>
+                <MagneticButton onClick={onClose}>{t('gotIt', lang)}</MagneticButton>
+            </div>
         </div>
     );
 };
@@ -359,14 +376,27 @@ export const GameCanvas: React.FC = () => {
         Persistence.save('lang', newLang);
     };
 
-    const checkHighScore = useCallback((final: number) => {
-        Persistence.load('highScore').then((val) => {
-            const currentHigh = typeof val === 'number' ? val : 0;
-            if (final > currentHigh) {
-                Persistence.save('highScore', final);
-                setHighScore(final);
+    const syncLeaderboards = useCallback(async (currentScore: number, isNewLocalHigh: boolean) => {
+        try {
+            // 1. Fetch global state
+            const res = await fetch('/api/leaderboard');
+            if (!res.ok) return;
+            const data = await res.json();
+            const globalScores: LeaderboardItem[] = data.leaderboard || [];
+            const globalLowest = globalScores.length < 50 ? 0 : (globalScores[globalScores.length - 1]?.score || 0);
 
-                // Take snapshot from video
+            // O(N) lookup map for efficiency (avoids O(n^2) nested loops)
+            const globalScoresMap = new Map(globalScores.map(s => [s.name.toLowerCase(), s.score]));
+
+            // 2. Load local state
+            const localList = await Persistence.load('leaderboard').then(v => Array.isArray(v) ? v as LeaderboardItem[] : []);
+            const playerName = await Persistence.load('playerName').then(v => typeof v === 'string' ? v : '');
+
+            // 3. Determine if we should show name entry
+            const qualifiesForGlobal = currentScore > globalLowest || globalScores.length < 50;
+
+            if (isNewLocalHigh || (qualifiesForGlobal && !playerName)) {
+                let snapshot = undefined;
                 if (videoRef.current) {
                     const canvas = document.createElement('canvas');
                     const ctx = canvas.getContext('2d');
@@ -374,20 +404,70 @@ export const GameCanvas: React.FC = () => {
                         canvas.width = videoRef.current.videoWidth;
                         canvas.height = videoRef.current.videoHeight;
                         ctx.drawImage(videoRef.current, 0, 0);
-                        const snap = canvas.toDataURL('image/webp', 0.5);
-                        setPendingSnapshot(snap);
+                        snapshot = canvas.toDataURL('image/webp', 0.5);
                     }
                 }
-                setPendingScore(final);
+                setPendingScore(currentScore);
+                setPendingSnapshot(snapshot);
                 setShowNameEntry(true);
+                return;
             }
-        });
 
-        // Refresh leaderboard
-        Persistence.load('leaderboard').then((list) => {
-            if (Array.isArray(list)) setLeaderboard(list as LeaderboardItem[]);
-        });
+            // 4. Efficient Auto-sync for ALL qualifying local scores
+            const syncPromises = [];
+            const processedNames = new Set<string>();
+
+            // Combine local list and current score for evaluation
+            const candidates = [...localList];
+            if (playerName && currentScore > 0) {
+                candidates.push({ name: playerName, score: currentScore });
+            }
+
+            for (const item of candidates) {
+                const nameLower = item.name.toLowerCase();
+                if (processedNames.has(nameLower)) continue;
+                processedNames.add(nameLower);
+
+                const gScore = globalScoresMap.get(nameLower);
+                const qualifies = item.score > (gScore ?? -1) && (item.score > globalLowest || globalScores.length < 50);
+
+                if (qualifies) {
+                    syncPromises.push(
+                        fetch('/api/submit-score', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                name: item.name,
+                                score: item.score,
+                                snapshot: item.snapshot
+                            })
+                        }).catch(() => { })
+                    );
+                }
+            }
+
+            if (syncPromises.length > 0) await Promise.all(syncPromises);
+        } catch (e) {
+            console.warn('Sync failed', e);
+        }
     }, []);
+
+    const checkHighScore = useCallback(async (final: number) => {
+        const currentHigh = await Persistence.load('highScore').then((val) => typeof val === 'number' ? val : 0);
+        const isNewLocalHigh = final > currentHigh;
+
+        if (isNewLocalHigh) {
+            await Persistence.save('highScore', final);
+            setHighScore(final);
+        }
+
+        // This function handles showing name entry OR auto-syncing
+        await syncLeaderboards(final, isNewLocalHigh);
+
+        // Refresh local leaderboard
+        const list = await Persistence.load('leaderboard');
+        if (Array.isArray(list)) setLeaderboard(list as LeaderboardItem[]);
+    }, [syncLeaderboards]);
 
     // Load initial data
     useEffect(() => {
@@ -535,14 +615,18 @@ export const GameCanvas: React.FC = () => {
 
         const newList = [...existing, { name: name.trim(), score: pendingScore, snapshot: pendingSnapshot }]
             .sort((a, b) => b.score - a.score)
-            .slice(0, 10);
+            .slice(0, 10)
+            .map((item, i) => ({
+                ...item,
+                snapshot: i < 3 ? item.snapshot : undefined
+            }));
 
         await Persistence.save('leaderboard', newList);
         await Persistence.save('playerName', name.trim());
         setLeaderboard(newList);
         setPlayerName(name.trim());
 
-        // Submit to global leaderboard
+        // Submit to global leaderboard (already checked in submitToGlobalIfQualified, but ensure it's submitted)
         try {
             const res = await fetch('/api/submit-score', {
                 method: 'POST',
@@ -553,6 +637,8 @@ export const GameCanvas: React.FC = () => {
                 const result = await res.json();
                 if (!result.success) {
                     console.warn('Score not in top 50. Keep trying!');
+                } else {
+                    console.log('Score successfully submitted to global leaderboard!');
                 }
             } else {
                 console.warn('Global leaderboard submission failed (API error)');
@@ -577,7 +663,7 @@ export const GameCanvas: React.FC = () => {
         setLives(3);
     };
 
-    const fetchGlobal = async () => {
+    const fetchGlobal = useCallback(async () => {
         try {
             const res = await fetch('/api/leaderboard');
             if (!res.ok) {
@@ -586,12 +672,35 @@ export const GameCanvas: React.FC = () => {
                 return;
             }
             const data = await res.json();
-            setGlobalLeaderboard(data.leaderboard || []);
+            const newGlobal = data.leaderboard || [];
+            setGlobalLeaderboard(newGlobal);
+
+            // Trigger a sync of local bests to global
+            syncLeaderboards(0, false);
         } catch {
             console.warn('Global leaderboard not available (network error)');
             setGlobalLeaderboard([]);
         }
-    };
+    }, [syncLeaderboards]);
+
+    // Live Polling for Global Leaderboard
+    useEffect(() => {
+        // Initial fetch
+        const initFetch = async () => {
+            await fetchGlobal();
+        };
+        initFetch();
+
+        // Poll every 10 seconds for "live" feel
+        const interval = setInterval(() => {
+            // Only poll if we are on start screen or leaderboard is open
+            if (gameState === 'START' || showLeaderboard) {
+                fetchGlobal();
+            }
+        }, 10000);
+
+        return () => clearInterval(interval);
+    }, [fetchGlobal, gameState, showLeaderboard]);
 
     return (
         <div id="game-container">
