@@ -1,5 +1,7 @@
 import { CONFIG, type HandData, type Point, type BladePoint } from './GameTypes';
 import { Fruit, Particle, Sparkle, spawnDoubleFruit } from './Entities';
+import { StrokeRenderer } from './StrokeRenderer';
+import type { StrokeId } from './StrokeTypes';
 
 export class GameEngine {
     width: number = 0;
@@ -13,6 +15,9 @@ export class GameEngine {
     particles: Particle[] = [];
     sparkles: Sparkle[] = [];
     bladeTrail: BladePoint[] = [];
+
+    // Stroke Rendering
+    private strokeRenderer: StrokeRenderer = new StrokeRenderer();
 
     // Hand Tracking
     rawHand: HandData = { x: -100, y: -100, visible: false };
@@ -76,6 +81,10 @@ export class GameEngine {
         this.rawHand = hand;
     }
 
+    setStroke(strokeId: StrokeId) {
+        this.strokeRenderer.setStroke(strokeId);
+    }
+
     private lerp(start: number, end: number, amt: number) {
         return (1 - amt) * start + amt * end;
     }
@@ -120,8 +129,9 @@ export class GameEngine {
         if (this.rawHand.visible) {
             this.bladeTrail.push({ x: this.smoothedHand.x, y: this.smoothedHand.y, time: now });
 
-            // Spawn sparkles along the trail - scale probability with dt
-            if (Math.random() < 0.3 * dt) {
+            // Spawn sparkles for classic stroke (other strokes handle their own particles)
+            const currentStroke = this.strokeRenderer.getCurrentStroke();
+            if (currentStroke.particleType === 'sparkle' && Math.random() < 0.3 * dt) {
                 this.sparkles.push(new Sparkle(this.smoothedHand.x, this.smoothedHand.y));
             }
         }
@@ -129,52 +139,14 @@ export class GameEngine {
         // Remove old points (older than 300ms)
         this.bladeTrail = this.bladeTrail.filter(p => now - p.time < 300);
 
-        if (this.bladeTrail.length > 1) {
-            // Calculate blade speed for dynamic width
-            const lastTwo = this.bladeTrail.slice(-2);
-            const speed = Math.hypot(lastTwo[1].x - lastTwo[0].x, lastTwo[1].y - lastTwo[0].y);
-            const dynamicWidth = Math.min(15, Math.max(3, speed * 0.5));
-
-            // Outer glow
-            ctx.beginPath();
-            ctx.moveTo(this.bladeTrail[0].x, this.bladeTrail[0].y);
-            for (let i = 1; i < this.bladeTrail.length; i++) {
-                ctx.lineTo(this.bladeTrail[i].x, this.bladeTrail[i].y);
-            }
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-
-            // Glow layer
-            ctx.shadowBlur = 25;
-            ctx.shadowColor = CONFIG.colors.blade;
-            ctx.lineWidth = dynamicWidth + 8;
-            ctx.strokeStyle = CONFIG.colors.bladeGlow;
-            ctx.stroke();
-
-            // Mid layer
-            ctx.shadowBlur = 10;
-            ctx.lineWidth = dynamicWidth + 4;
-            ctx.strokeStyle = CONFIG.colors.blade;
-            ctx.stroke();
-
-            // Core (white hot center)
-            ctx.shadowBlur = 0;
-            ctx.lineWidth = dynamicWidth;
-            ctx.strokeStyle = CONFIG.colors.bladeCore;
-            ctx.stroke();
-
-            // Draw fading segments
-            for (let i = 0; i < this.bladeTrail.length; i++) {
-                const age = (now - this.bladeTrail[i].time) / 300;
-                const alpha = 1 - age;
-                if (alpha > 0 && i > 0) {
-                    ctx.beginPath();
-                    ctx.arc(this.bladeTrail[i].x, this.bladeTrail[i].y, 3 * alpha, 0, Math.PI * 2);
-                    ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.5})`;
-                    ctx.fill();
-                }
-            }
-        }
+        // Use StrokeRenderer for all stroke rendering
+        this.strokeRenderer.render(
+            ctx,
+            this.bladeTrail,
+            this.rawHand.visible,
+            this.smoothedHand,
+            dt
+        );
     }
 
     private handleSpawning(dt: number) {

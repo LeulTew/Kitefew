@@ -4,11 +4,33 @@ import { MediaPipeService } from '../logic/MediaPipeService';
 import type { Results } from '@mediapipe/hands';
 import { get, set } from 'idb-keyval';
 import { t, type Language } from '../i18n';
+import { STROKE_PRESETS, type StrokeId } from '../logic/StrokeTypes';
 
 // Images - Using static imports for Vite bundling
 import guideGoodFrame from '../assets/guide_good_frame.webp';
 import guideBadFrame from '../assets/guide_bad_frame.webp';
 import guideGameplay from '../assets/guide_gameplay_action.webp';
+
+// Stroke Preview Images
+import strokeClassicImg from '../assets/stroke_classic_1767089871250.png';
+import strokeStarfallImg from '../assets/stroke_starfall_1767089890647.png';
+import strokeFireImg from '../assets/stroke_fire_1767089907540.png';
+import strokeIceImg from '../assets/stroke_ice_1767089938190.png';
+import strokeNeonImg from '../assets/stroke_neon_1767089957447.png';
+
+// Map stroke ids to images (some will use fallback colors)
+const STROKE_IMAGES: Record<StrokeId, string | null> = {
+    classic: strokeClassicImg,
+    starfall: strokeStarfallImg,
+    fire: strokeFireImg,
+    ice: strokeIceImg,
+    neon: strokeNeonImg,
+    shadow: null, // Will use color preview
+    rainbow: null,
+    electric: null,
+    cosmic: null,
+    golden: null
+};
 
 // --- TYPES ---
 type LeaderboardItem = { name: string; score: number; snapshot?: string };
@@ -229,6 +251,8 @@ const NameEntryModal: React.FC<{ score: number, snapshot?: string, onSave: (name
     );
 };
 
+
+
 // --- LEADERBOARD MODAL ---
 const LeaderboardModal: React.FC<{ data: LeaderboardItem[], globalData: LeaderboardItem[], onClose: () => void, lang: Language, t: TFunction }> = ({ data, globalData, onClose, lang, t }) => {
     return (
@@ -334,7 +358,128 @@ const AboutModal: React.FC<{ onClose: () => void; lang: Language; t: TFunction }
     );
 };
 
-// --- MAIN COMPONENT ---
+// --- BLADE ICON ---
+const BladeIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="20" height="20">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+    </svg>
+);
+
+// --- STROKE SELECTOR MODAL ---
+const StrokeSelectorModal: React.FC<{
+    currentStroke: StrokeId;
+    onSelect: (id: StrokeId) => void;
+    onClose: () => void;
+    lang: Language;
+    t: TFunction;
+}> = ({ currentStroke, onSelect, onClose, lang, t }) => {
+    return (
+        <div className="modal" style={{ zIndex: 100, maxWidth: '800px', maxHeight: '85vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <h1 style={{ fontSize: '2rem', marginBottom: '1rem', flexShrink: 0 }}>{t('strokesTitle', lang)}</h1>
+
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+                gap: '15px',
+                margin: '1rem 0',
+                overflowY: 'auto',
+                flexGrow: 1,
+                paddingRight: '10px'
+            }}>
+                {STROKE_PRESETS.map(stroke => {
+                    const previewImg = STROKE_IMAGES[stroke.id];
+                    const isSelected = currentStroke === stroke.id;
+
+                    return (
+                        <div
+                            key={stroke.id}
+                            onClick={() => onSelect(stroke.id)}
+                            style={{
+                                position: 'relative',
+                                aspectRatio: '16/9',
+                                borderRadius: '8px',
+                                overflow: 'hidden',
+                                border: isSelected ? '3px solid var(--accent-color)' : '2px solid var(--border-color)',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                boxShadow: isSelected ? '0 0 20px rgba(204, 255, 0, 0.3)' : 'none',
+                                background: previewImg ? 'transparent' : `linear-gradient(135deg, ${stroke.colors.blade}, ${stroke.colors.bladeGlow})`
+                            }}
+                        >
+                            {previewImg ? (
+                                <img
+                                    src={previewImg}
+                                    alt={stroke.name}
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                />
+                            ) : (
+                                <div style={{
+                                    width: '100%',
+                                    height: '100%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    background: 'var(--bg-secondary)'
+                                }}>
+                                    <div style={{
+                                        width: '60%',
+                                        height: '4px',
+                                        background: `linear-gradient(90deg, ${stroke.colors.blade}, ${stroke.colors.bladeCore})`,
+                                        borderRadius: '2px',
+                                        boxShadow: `0 0 15px ${stroke.colors.blade}`,
+                                        transform: 'rotate(-15deg)'
+                                    }} />
+                                </div>
+                            )}
+
+                            {/* Stroke name label */}
+                            <div style={{
+                                position: 'absolute',
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                padding: '4px 8px',
+                                background: 'rgba(0,0,0,0.7)',
+                                fontSize: '0.75rem',
+                                fontWeight: 'bold',
+                                textAlign: 'center',
+                                color: stroke.colors.blade
+                            }}>
+                                {lang === 'am' ? stroke.nameAm : stroke.name}
+                            </div>
+
+                            {/* Selection checkmark */}
+                            {isSelected && (
+                                <div style={{
+                                    position: 'absolute',
+                                    top: '5px',
+                                    right: '5px',
+                                    background: 'var(--accent-color)',
+                                    color: 'var(--bg-color)',
+                                    width: '22px',
+                                    height: '22px',
+                                    borderRadius: '50%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontWeight: 'bold',
+                                    fontSize: '14px'
+                                }}>
+                                    ✓
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+
+            <div style={{ flexShrink: 0, marginTop: '1rem' }}>
+                <MagneticButton onClick={onClose}>{t('gotIt', lang)}</MagneticButton>
+            </div>
+        </div>
+    );
+};
+
 export const GameCanvas: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -358,6 +503,10 @@ export const GameCanvas: React.FC = () => {
     const [globalLeaderboard, setGlobalLeaderboard] = useState<LeaderboardItem[]>([]);
     const [showLeaderboard, setShowLeaderboard] = useState(false);
     const [cameraActive, setCameraActive] = useState(false);
+
+    // Stroke Selection
+    const [currentStroke, setCurrentStroke] = useState<StrokeId>('classic');
+    const [showStrokeSelector, setShowStrokeSelector] = useState(false);
 
     // Settings
     const [theme, setTheme] = useState<'dark' | 'light'>('dark');
@@ -395,7 +544,13 @@ export const GameCanvas: React.FC = () => {
             // 3. Determine if we should show name entry
             const qualifiesForGlobal = currentScore > globalLowest || globalScores.length < 50;
 
-            if (isNewLocalHigh || (qualifiesForGlobal && !playerName)) {
+            // Don't show any modal if score is 0
+            if (currentScore <= 0) {
+                return;
+            }
+
+            // For new high scores or qualifying global scores
+            if (isNewLocalHigh || qualifiesForGlobal) {
                 let snapshot = undefined;
                 if (videoRef.current) {
                     const canvas = document.createElement('canvas');
@@ -409,7 +564,14 @@ export const GameCanvas: React.FC = () => {
                 }
                 setPendingScore(currentScore);
                 setPendingSnapshot(snapshot);
-                setShowNameEntry(true);
+                // If user already has a name, show simpler modal
+                if (playerName) {
+                    // Don't show modal for users with existing name - auto-submit
+                    setShowNameEntry(true);
+                } else {
+                    // No name set, show name entry modal
+                    setShowNameEntry(true);
+                }
                 return;
             }
 
@@ -473,6 +635,11 @@ export const GameCanvas: React.FC = () => {
     useEffect(() => {
         Persistence.load('playerName').then(v => { if (typeof v === 'string') setPlayerName(v); });
         Persistence.load('leaderboard').then(v => { if (Array.isArray(v)) setLeaderboard(v as LeaderboardItem[]); });
+        Persistence.load('selectedStroke').then(v => {
+            if (typeof v === 'string' && STROKE_PRESETS.some(s => s.id === v)) {
+                setCurrentStroke(v as StrokeId);
+            }
+        });
     }, []);
 
     const spawnFeedback = useCallback((x: number, y: number, text: string) => {
@@ -533,6 +700,14 @@ export const GameCanvas: React.FC = () => {
         handleResize();
         return () => window.removeEventListener('resize', handleResize);
     }, []);
+
+    // Sync stroke with engine when it changes
+    useEffect(() => {
+        if (engineRef.current) {
+            engineRef.current.setStroke(currentStroke);
+        }
+    }, [currentStroke]);
+
 
     const onResults = useCallback((results: Results) => {
         if (!engineRef.current) return;
@@ -646,10 +821,10 @@ export const GameCanvas: React.FC = () => {
         } catch {
             console.warn('Global leaderboard submission failed (network error)');
         }
-
         setShowNameEntry(false);
         setGameState('START');
     };
+
 
     const turnOffCamera = async () => {
         if (mpRef.current) {
@@ -798,7 +973,10 @@ export const GameCanvas: React.FC = () => {
                             {cameraActive && (
                                 <MagneticButton onClick={turnOffCamera} secondary>{t('turnOffCamera', lang)} <CameraOffIcon /></MagneticButton>
                             )}
-                            <MagneticButton onClick={() => setGameState('ABOUT')} secondary>{t('about', lang)}</MagneticButton>
+                            <div style={{ display: 'flex', gap: '15px', width: '100%' }}>
+                                <div style={{ flex: 1 }}><MagneticButton onClick={() => setShowStrokeSelector(true)} secondary>{t('strokesTitle', lang)} <BladeIcon /></MagneticButton></div>
+                                <div style={{ flex: 1 }}><MagneticButton onClick={() => setGameState('ABOUT')} secondary>{t('about', lang)}</MagneticButton></div>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -810,11 +988,26 @@ export const GameCanvas: React.FC = () => {
             {/* Name Entry */}
             {showNameEntry && <NameEntryModal score={pendingScore} snapshot={pendingSnapshot} onSave={saveScore} lang={lang} initialName={playerName} t={t} />}
 
+
             {/* Guide */}
             {gameState === 'GUIDE' && <GuideModal onClose={() => setGameState('START')} lang={lang} t={t} />}
 
             {/* About */}
             {gameState === 'ABOUT' && <AboutModal onClose={() => setGameState('START')} lang={lang} t={t} />}
+
+            {/* Stroke Selector */}
+            {showStrokeSelector && (
+                <StrokeSelectorModal
+                    currentStroke={currentStroke}
+                    onSelect={(id) => {
+                        setCurrentStroke(id);
+                        Persistence.save('selectedStroke', id);
+                    }}
+                    onClose={() => setShowStrokeSelector(false)}
+                    lang={lang}
+                    t={t}
+                />
+            )}
 
             {/* Game Over */}
             <div id="game-over-screen" className={`modal ${gameState === 'GAMEOVER' && !showNameEntry ? '' : 'hidden'}`}>

@@ -56,6 +56,9 @@ export const translations = {
         developer: 'Developer',
         developerName: 'Leul Tewodros Agonafer',
         contact: 'Contact',
+
+        // Strokes
+        strokesTitle: 'BLADE STYLES',
     },
     am: {
         // Start Screen
@@ -110,6 +113,9 @@ export const translations = {
         developer: 'ገንቢ',
         developerName: 'ልኡል ቴዎድሮስ አጎናፈር',
         contact: 'አድራሻ',
+
+        // Strokes
+        strokesTitle: 'ስትሮክ ዓይነቶች',
     }
 };
 
