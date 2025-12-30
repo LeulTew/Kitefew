@@ -418,13 +418,18 @@ export class StrokeRenderer {
 
         const lastTwo = trail.slice(-2);
         const speed = Math.hypot(lastTwo[1].x - lastTwo[0].x, lastTwo[1].y - lastTwo[0].y);
-        const dynamicWidth = Math.min(15, Math.max(3, speed * 0.5)) * config.trailWidth;
+        // Thinner, smoother blade
+        const dynamicWidth = Math.min(8, Math.max(2, speed * 0.35)) * config.trailWidth;
 
-        // Draw gradient trail with Dracula colors
+        // Smooth bezier curve path
         ctx.beginPath();
         ctx.moveTo(trail[0].x, trail[0].y);
         for (let i = 1; i < trail.length; i++) {
-            ctx.lineTo(trail[i].x, trail[i].y);
+            const prev = trail[i - 1];
+            const curr = trail[i];
+            const cpX = (prev.x + curr.x) / 2;
+            const cpY = (prev.y + curr.y) / 2;
+            ctx.quadraticCurveTo(prev.x, prev.y, cpX, cpY);
         }
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
@@ -432,13 +437,13 @@ export class StrokeRenderer {
         // Purple glow
         ctx.shadowBlur = 30 * config.glowIntensity;
         ctx.shadowColor = config.colors.blade;
-        ctx.lineWidth = dynamicWidth + 10;
+        ctx.lineWidth = dynamicWidth + 8;
         ctx.strokeStyle = config.colors.bladeGlow;
         ctx.stroke();
 
         // Main blade
         ctx.shadowBlur = 15;
-        ctx.lineWidth = dynamicWidth + 4;
+        ctx.lineWidth = dynamicWidth + 3;
         ctx.strokeStyle = config.colors.blade;
         ctx.stroke();
 
@@ -485,48 +490,107 @@ export class StrokeRenderer {
 
         const lastTwo = trail.slice(-2);
         const speed = Math.hypot(lastTwo[1].x - lastTwo[0].x, lastTwo[1].y - lastTwo[0].y);
-        const dynamicWidth = Math.min(18, Math.max(4, speed * 0.6)) * config.trailWidth;
+        const dynamicWidth = Math.min(10, Math.max(3, speed * 0.4)) * config.trailWidth;
 
+        // Smooth bezier curve path
         ctx.beginPath();
         ctx.moveTo(trail[0].x, trail[0].y);
         for (let i = 1; i < trail.length; i++) {
-            ctx.lineTo(trail[i].x, trail[i].y);
+            const prev = trail[i - 1];
+            const curr = trail[i];
+            const cpX = (prev.x + curr.x) / 2;
+            const cpY = (prev.y + curr.y) / 2;
+            ctx.quadraticCurveTo(prev.x, prev.y, cpX, cpY);
         }
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
-        // Outer fire glow
-        ctx.shadowBlur = 35 * config.glowIntensity;
+        // Multi-layer fire effect
+        // Outer red-orange glow
+        ctx.shadowBlur = 50 * config.glowIntensity;
+        ctx.shadowColor = '#ff2200';
+        ctx.lineWidth = dynamicWidth + 16;
+        ctx.strokeStyle = 'rgba(255, 34, 0, 0.15)';
+        ctx.stroke();
+
+        // Orange fire layer
+        ctx.shadowBlur = 35;
         ctx.shadowColor = '#ff4500';
-        ctx.lineWidth = dynamicWidth + 12;
+        ctx.lineWidth = dynamicWidth + 10;
         ctx.strokeStyle = 'rgba(255, 69, 0, 0.3)';
         ctx.stroke();
 
-        // Main fire
+        // Yellow-orange main fire
         ctx.shadowBlur = 20;
         ctx.shadowColor = '#ff6b35';
-        ctx.lineWidth = dynamicWidth + 6;
+        ctx.lineWidth = dynamicWidth + 5;
         ctx.strokeStyle = config.colors.blade;
         ctx.stroke();
 
-        // Hot core
-        ctx.shadowBlur = 5;
+        // White-hot core
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = '#fff4e0';
         ctx.lineWidth = dynamicWidth;
         ctx.strokeStyle = config.colors.bladeCore;
         ctx.stroke();
 
-        // Flickering heat waves along trail
-        for (let i = 0; i < trail.length; i += 2) {
-            const age = (now - trail[i].time) / 300;
-            const alpha = (1 - age) * 0.5;
-            const flicker = Math.sin(now * 0.01 + i) * 5;
-            if (alpha > 0) {
+        // Rising flames and embers
+        for (let i = 0; i < trail.length; i++) {
+            const age = (now - trail[i].time) / 280;
+            if (age > 1) continue;
+
+            // Flame tongues - rising with flicker
+            if (i % 2 === 0) {
+                const flameHeight = (1 - age) * 35;
+                const flickerX = Math.sin(now * 0.015 + i * 0.7) * 8;
+                const flickerY = Math.cos(now * 0.012 + i) * 4;
+
+                // Outer flame (red)
                 ctx.beginPath();
-                ctx.arc(trail[i].x + flicker, trail[i].y - age * 20, 4 * (1 - age), 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(255, 200, 100, ${alpha})`;
+                ctx.ellipse(
+                    trail[i].x + flickerX,
+                    trail[i].y - flameHeight + flickerY,
+                    6 * (1 - age * 0.5),
+                    10 * (1 - age * 0.3),
+                    0, 0, Math.PI * 2
+                );
+                ctx.fillStyle = `rgba(255, 50, 0, ${(1 - age) * 0.4})`;
+                ctx.fill();
+
+                // Inner flame (orange-yellow)
+                ctx.beginPath();
+                ctx.ellipse(
+                    trail[i].x + flickerX * 0.5,
+                    trail[i].y - flameHeight * 0.7 + flickerY,
+                    4 * (1 - age * 0.5),
+                    7 * (1 - age * 0.3),
+                    0, 0, Math.PI * 2
+                );
+                ctx.fillStyle = `rgba(255, 180, 50, ${(1 - age) * 0.6})`;
+                ctx.fill();
+            }
+
+            // Small rising embers
+            if (i % 3 === 0) {
+                const emberRise = age * 45;
+                const emberDrift = Math.sin(now * 0.008 + i * 1.5) * 12;
+                const emberSize = 3 * (1 - age * 0.7);
+
+                ctx.beginPath();
+                ctx.arc(
+                    trail[i].x + emberDrift,
+                    trail[i].y - emberRise,
+                    emberSize,
+                    0, Math.PI * 2
+                );
+                ctx.fillStyle = `rgba(255, ${150 + Math.random() * 100}, 50, ${(1 - age) * 0.8})`;
+                ctx.shadowBlur = 6;
+                ctx.shadowColor = '#ff6b35';
                 ctx.fill();
             }
         }
+
+        ctx.shadowBlur = 0;
     }
 
     private renderIce(ctx: CanvasRenderingContext2D, trail: BladePoint[]) {
@@ -535,57 +599,112 @@ export class StrokeRenderer {
 
         const lastTwo = trail.slice(-2);
         const speed = Math.hypot(lastTwo[1].x - lastTwo[0].x, lastTwo[1].y - lastTwo[0].y);
-        const dynamicWidth = Math.min(12, Math.max(3, speed * 0.4)) * config.trailWidth;
+        const dynamicWidth = Math.min(6, Math.max(2, speed * 0.25)) * config.trailWidth;
 
+        // Smooth bezier curve path
         ctx.beginPath();
         ctx.moveTo(trail[0].x, trail[0].y);
         for (let i = 1; i < trail.length; i++) {
-            ctx.lineTo(trail[i].x, trail[i].y);
+            const prev = trail[i - 1];
+            const curr = trail[i];
+            const cpX = (prev.x + curr.x) / 2;
+            const cpY = (prev.y + curr.y) / 2;
+            ctx.quadraticCurveTo(prev.x, prev.y, cpX, cpY);
         }
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
-        // Ice glow
-        ctx.shadowBlur = 25 * config.glowIntensity;
-        ctx.shadowColor = '#00e5ff';
-        ctx.lineWidth = dynamicWidth + 8;
-        ctx.strokeStyle = config.colors.bladeGlow;
+        // Multi-layer frost effect
+        // Outer frost mist (wide, subtle)
+        ctx.shadowBlur = 45 * config.glowIntensity;
+        ctx.shadowColor = '#ffffff';
+        ctx.lineWidth = dynamicWidth + 14;
+        ctx.strokeStyle = 'rgba(200, 240, 255, 0.12)';
         ctx.stroke();
 
-        // Ice blade
-        ctx.shadowBlur = 12;
+        // Cold aura (light blue)
+        ctx.shadowBlur = 30;
+        ctx.shadowColor = '#a8e6ff';
+        ctx.lineWidth = dynamicWidth + 8;
+        ctx.strokeStyle = 'rgba(168, 230, 255, 0.25)';
+        ctx.stroke();
+
+        // Ice blue layer
+        ctx.shadowBlur = 18;
+        ctx.shadowColor = '#00e5ff';
         ctx.lineWidth = dynamicWidth + 4;
         ctx.strokeStyle = config.colors.blade;
         ctx.stroke();
 
-        // Crystalline core
-        ctx.shadowBlur = 3;
+        // Crystalline white core
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#ffffff';
         ctx.lineWidth = dynamicWidth;
-        ctx.strokeStyle = config.colors.bladeCore;
+        ctx.strokeStyle = '#ffffff';
         ctx.stroke();
 
-        // Frost crystals along trail
-        for (let i = 0; i < trail.length; i += 4) {
-            const age = (now - trail[i].time) / 300;
-            const alpha = (1 - age) * 0.6;
-            if (alpha > 0) {
-                ctx.save();
-                ctx.globalAlpha = alpha;
-                ctx.translate(trail[i].x, trail[i].y);
-                ctx.rotate(age * Math.PI);
-                ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 1;
-                // Small cross crystal
+        // Frost mist particles (floating upward)
+        for (let i = 0; i < trail.length; i++) {
+            const age = (now - trail[i].time) / 400;
+            if (age > 1) continue;
+
+            // Frost mist - diffusing cold particles
+            if (i % 2 === 0) {
+                const mistDrift = Math.sin(now * 0.003 + i * 0.5) * 12;
+                const mistRise = age * 20;
+                const mistSize = 8 * (1 - age * 0.3) * (1 + Math.sin(now * 0.005 + i) * 0.2);
+
                 ctx.beginPath();
-                const size = 4 * (1 - age * 0.5);
-                ctx.moveTo(-size, 0);
-                ctx.lineTo(size, 0);
-                ctx.moveTo(0, -size);
-                ctx.lineTo(0, size);
-                ctx.stroke();
+                ctx.arc(
+                    trail[i].x + mistDrift,
+                    trail[i].y - mistRise,
+                    mistSize,
+                    0, Math.PI * 2
+                );
+                ctx.fillStyle = `rgba(200, 240, 255, ${(1 - age) * 0.2})`;
+                ctx.fill();
+            }
+
+            // Floating ice crystals
+            if (i % 3 === 0) {
+                ctx.save();
+                ctx.globalAlpha = (1 - age) * 0.8;
+                const crystalDrift = Math.sin(now * 0.004 + i * 0.8) * 8;
+                const crystalFloat = age * 25 + Math.sin(now * 0.006 + i) * 5;
+                ctx.translate(trail[i].x + crystalDrift, trail[i].y - crystalFloat);
+                ctx.rotate(age * Math.PI * 0.3 + i * 0.5);
+
+                const size = 5 * (1 - age * 0.4);
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 1.5;
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = '#00e5ff';
+
+                // Draw 6-pointed snowflake crystal
+                for (let j = 0; j < 6; j++) {
+                    const angle = (j * Math.PI) / 3;
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    const outerX = Math.cos(angle) * size;
+                    const outerY = Math.sin(angle) * size;
+                    ctx.lineTo(outerX, outerY);
+                    // Add branches
+                    if (size > 2) {
+                        const branchSize = size * 0.35;
+                        ctx.moveTo(outerX * 0.6, outerY * 0.6);
+                        ctx.lineTo(outerX * 0.6 + Math.cos(angle + Math.PI / 5) * branchSize,
+                            outerY * 0.6 + Math.sin(angle + Math.PI / 5) * branchSize);
+                        ctx.moveTo(outerX * 0.6, outerY * 0.6);
+                        ctx.lineTo(outerX * 0.6 + Math.cos(angle - Math.PI / 5) * branchSize,
+                            outerY * 0.6 + Math.sin(angle - Math.PI / 5) * branchSize);
+                    }
+                    ctx.stroke();
+                }
                 ctx.restore();
             }
         }
+
+        ctx.shadowBlur = 0;
     }
 
     private renderNeon(ctx: CanvasRenderingContext2D, trail: BladePoint[]) {
@@ -594,46 +713,72 @@ export class StrokeRenderer {
 
         const lastTwo = trail.slice(-2);
         const speed = Math.hypot(lastTwo[1].x - lastTwo[0].x, lastTwo[1].y - lastTwo[0].y);
-        const dynamicWidth = Math.min(16, Math.max(4, speed * 0.5)) * config.trailWidth;
+        // Thinner blade with smooth curves
+        const dynamicWidth = Math.min(8, Math.max(2, speed * 0.3)) * config.trailWidth;
 
         // Pulsing effect
         const pulse = Math.sin(now * 0.005) * 0.2 + 0.8;
 
+        // Smooth bezier curve path
         ctx.beginPath();
         ctx.moveTo(trail[0].x, trail[0].y);
         for (let i = 1; i < trail.length; i++) {
-            ctx.lineTo(trail[i].x, trail[i].y);
+            const prev = trail[i - 1];
+            const curr = trail[i];
+            const cpX = (prev.x + curr.x) / 2;
+            const cpY = (prev.y + curr.y) / 2;
+            ctx.quadraticCurveTo(prev.x, prev.y, cpX, cpY);
         }
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
-        // Magenta outer glow
-        ctx.shadowBlur = 40 * config.glowIntensity * pulse;
-        ctx.shadowColor = '#ff00ff';
-        ctx.lineWidth = dynamicWidth + 14;
-        ctx.strokeStyle = 'rgba(255, 0, 255, 0.2)';
+        // Orange/red outer fire glow
+        ctx.shadowBlur = 45 * config.glowIntensity * pulse;
+        ctx.shadowColor = '#ff4500';
+        ctx.lineWidth = dynamicWidth + 10;
+        ctx.strokeStyle = 'rgba(255, 69, 0, 0.2)';
         ctx.stroke();
 
-        // Cyan inner glow
-        ctx.shadowBlur = 25 * pulse;
-        ctx.shadowColor = '#00ffff';
-        ctx.lineWidth = dynamicWidth + 8;
-        ctx.strokeStyle = 'rgba(0, 255, 255, 0.3)';
+        // Magenta fire layer
+        ctx.shadowBlur = 30 * pulse;
+        ctx.shadowColor = '#ff00ff';
+        ctx.lineWidth = dynamicWidth + 6;
+        ctx.strokeStyle = 'rgba(255, 0, 255, 0.3)';
         ctx.stroke();
 
         // Main magenta blade
         ctx.shadowBlur = 15;
         ctx.shadowColor = '#ff00ff';
-        ctx.lineWidth = dynamicWidth + 4;
+        ctx.lineWidth = dynamicWidth + 3;
         ctx.strokeStyle = config.colors.blade;
         ctx.stroke();
 
-        // Cyan core
+        // Cyan hot core
         ctx.shadowBlur = 8;
         ctx.shadowColor = '#00ffff';
         ctx.lineWidth = dynamicWidth;
         ctx.strokeStyle = config.colors.bladeCore;
         ctx.stroke();
+
+        // Fire-like rising particles along trail
+        for (let i = 0; i < trail.length; i += 2) {
+            const age = (now - trail[i].time) / 250;
+            const alpha = (1 - age) * 0.7;
+            const rise = age * 25; // Particles rise up
+            const flicker = Math.sin(now * 0.015 + i) * 5;
+            if (alpha > 0) {
+                // Rising ember
+                ctx.beginPath();
+                ctx.arc(trail[i].x + flicker, trail[i].y - rise, 3 * (1 - age * 0.5), 0, Math.PI * 2);
+                const hue = (i % 2 === 0) ? '#ff00ff' : '#ff4500';
+                ctx.fillStyle = hue;
+                ctx.globalAlpha = alpha;
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = hue;
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
+            }
+        }
     }
 
     private renderShadow(ctx: CanvasRenderingContext2D, trail: BladePoint[]) {
@@ -642,48 +787,105 @@ export class StrokeRenderer {
 
         const lastTwo = trail.slice(-2);
         const speed = Math.hypot(lastTwo[1].x - lastTwo[0].x, lastTwo[1].y - lastTwo[0].y);
-        const dynamicWidth = Math.min(15, Math.max(3, speed * 0.5)) * config.trailWidth;
+        const dynamicWidth = Math.min(8, Math.max(2, speed * 0.3)) * config.trailWidth;
 
+        // Smooth bezier curve path
         ctx.beginPath();
         ctx.moveTo(trail[0].x, trail[0].y);
         for (let i = 1; i < trail.length; i++) {
-            ctx.lineTo(trail[i].x, trail[i].y);
+            const prev = trail[i - 1];
+            const curr = trail[i];
+            const cpX = (prev.x + curr.x) / 2;
+            const cpY = (prev.y + curr.y) / 2;
+            ctx.quadraticCurveTo(prev.x, prev.y, cpX, cpY);
         }
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
-        // Dark smoke outer
-        ctx.shadowBlur = 30 * config.glowIntensity;
-        ctx.shadowColor = '#1a0a2a';
+        // Multi-layer shadow effect
+        // Outer ethereal darkness (wide, subtle)
+        ctx.shadowBlur = 40 * config.glowIntensity;
+        ctx.shadowColor = '#0a0512';
         ctx.lineWidth = dynamicWidth + 12;
+        ctx.strokeStyle = 'rgba(10, 5, 18, 0.25)';
+        ctx.stroke();
+
+        // Dark purple aura
+        ctx.shadowBlur = 25;
+        ctx.shadowColor = '#1a0a2a';
+        ctx.lineWidth = dynamicWidth + 7;
         ctx.strokeStyle = 'rgba(26, 10, 42, 0.4)';
         ctx.stroke();
 
-        // Purple mid
-        ctx.shadowBlur = 20;
+        // Purple blade
+        ctx.shadowBlur = 15;
         ctx.shadowColor = config.colors.blade;
-        ctx.lineWidth = dynamicWidth + 6;
+        ctx.lineWidth = dynamicWidth + 3;
         ctx.strokeStyle = config.colors.blade;
         ctx.stroke();
 
         // Light purple core
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = 8;
         ctx.lineWidth = dynamicWidth;
         ctx.strokeStyle = config.colors.bladeCore;
         ctx.stroke();
 
-        // Smoky wisps
-        for (let i = 0; i < trail.length; i += 3) {
-            const age = (now - trail[i].time) / 300;
-            const alpha = (1 - age) * 0.3;
-            if (alpha > 0) {
-                const drift = Math.sin(now * 0.002 + i) * 10;
+        // Layered smoke effect
+        for (let i = 0; i < trail.length; i++) {
+            const age = (now - trail[i].time) / 400;
+            if (age > 1) continue;
+
+            // Large outer smoke wisps
+            if (i % 2 === 0) {
+                const drift = Math.sin(now * 0.002 + i * 0.6) * 15;
+                const rise = age * 18;
+                const expand = 1 + age * 1.2;
+                const sway = Math.cos(now * 0.003 + i) * 5;
+
+                // Outer dark wisp
                 ctx.beginPath();
-                ctx.arc(trail[i].x + drift, trail[i].y - age * 15, 6 * (1 - age * 0.3), 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(106, 13, 173, ${alpha})`;
+                ctx.arc(
+                    trail[i].x + drift + sway,
+                    trail[i].y - rise,
+                    12 * expand * (1 - age * 0.3),
+                    0, Math.PI * 2
+                );
+                ctx.fillStyle = `rgba(15, 8, 25, ${(1 - age) * 0.25})`;
+                ctx.fill();
+
+                // Purple tinted smoke
+                ctx.beginPath();
+                ctx.arc(
+                    trail[i].x + drift * 0.6 + sway * 0.5,
+                    trail[i].y - rise * 0.7,
+                    8 * expand * (1 - age * 0.4),
+                    0, Math.PI * 2
+                );
+                ctx.fillStyle = `rgba(60, 20, 80, ${(1 - age) * 0.35})`;
+                ctx.fill();
+            }
+
+            // Ghostly inner particles
+            if (i % 3 === 0) {
+                const ghostDrift = Math.sin(now * 0.004 + i * 1.2) * 10;
+                const ghostRise = age * 25;
+                const ghostSize = 4 * (1 - age * 0.5);
+
+                ctx.beginPath();
+                ctx.arc(
+                    trail[i].x + ghostDrift,
+                    trail[i].y - ghostRise,
+                    ghostSize,
+                    0, Math.PI * 2
+                );
+                ctx.fillStyle = `rgba(140, 80, 200, ${(1 - age) * 0.5})`;
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = '#6a0dad';
                 ctx.fill();
             }
         }
+
+        ctx.shadowBlur = 0;
     }
 
     private renderRainbow(ctx: CanvasRenderingContext2D, trail: BladePoint[], dt: number) {

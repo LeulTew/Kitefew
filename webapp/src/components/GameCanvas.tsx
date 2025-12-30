@@ -502,6 +502,7 @@ export const GameCanvas: React.FC = () => {
     const [pendingSnapshot, setPendingSnapshot] = useState<string | undefined>(undefined);
     const [globalLeaderboard, setGlobalLeaderboard] = useState<LeaderboardItem[]>([]);
     const [showLeaderboard, setShowLeaderboard] = useState(false);
+    const [isNewHighScore, setIsNewHighScore] = useState(false);
     const [cameraActive, setCameraActive] = useState(false);
 
     // Stroke Selection
@@ -564,10 +565,44 @@ export const GameCanvas: React.FC = () => {
                 }
                 setPendingScore(currentScore);
                 setPendingSnapshot(snapshot);
-                // If user already has a name, show simpler modal
-                if (playerName) {
-                    // Don't show modal for users with existing name - auto-submit
-                    setShowNameEntry(true);
+                // If user already has a name, don't show modal - just show game over with high score indicator
+                if (playerName && currentScore > 0) {
+                    // Auto-submit for existing user
+                    setIsNewHighScore(true);
+                    // Auto-save to local and global leaderboards
+                    const existingList = await Persistence.load('leaderboard') || [];
+                    if (Array.isArray(existingList)) {
+                        // Replace existing score for this user
+                        const existingIndex = existingList.findIndex((e: LeaderboardItem) =>
+                            typeof e.name === 'string' && e.name.toLowerCase() === playerName.toLowerCase()
+                        );
+                        let newList;
+                        if (existingIndex >= 0) {
+                            // Only update if new score is higher
+                            if (currentScore > existingList[existingIndex].score) {
+                                existingList[existingIndex] = { name: playerName, score: currentScore, snapshot };
+                            }
+                            newList = [...existingList]
+                                .sort((a, b) => b.score - a.score)
+                                .slice(0, 10)
+                                .map((item, i) => ({ ...item, snapshot: i < 3 ? item.snapshot : undefined }));
+                        } else {
+                            newList = [...existingList, { name: playerName, score: currentScore, snapshot }]
+                                .sort((a, b) => b.score - a.score)
+                                .slice(0, 10)
+                                .map((item, i) => ({ ...item, snapshot: i < 3 ? item.snapshot : undefined }));
+                        }
+                        await Persistence.save('leaderboard', newList);
+                        setLeaderboard(newList as LeaderboardItem[]);
+                    }
+                    // Submit to global
+                    try {
+                        await fetch('/api/submit-score', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ name: playerName, score: currentScore, snapshot })
+                        });
+                    } catch { /* silent */ }
                 } else {
                     // No name set, show name entry modal
                     setShowNameEntry(true);
@@ -788,7 +823,17 @@ export const GameCanvas: React.FC = () => {
             return;
         }
 
-        const newList = [...existing, { name: name.trim(), score: pendingScore, snapshot: pendingSnapshot }]
+        // If existing user is setting a new name, remove their old entry first
+        const existingIndex = existing.findIndex((e: LeaderboardItem) =>
+            typeof e.name === 'string' && e.name.toLowerCase() === playerName.toLowerCase()
+        );
+        let baseList = [...existing];
+        if (isExistingUser && existingIndex >= 0) {
+            // Remove old entry
+            baseList.splice(existingIndex, 1);
+        }
+
+        const newList = [...baseList, { name: name.trim(), score: pendingScore, snapshot: pendingSnapshot }]
             .sort((a, b) => b.score - a.score)
             .slice(0, 10)
             .map((item, i) => ({
@@ -1014,11 +1059,65 @@ export const GameCanvas: React.FC = () => {
                 <h1 style={{ whiteSpace: 'pre-line' }}>{t('gameOver', lang)}</h1>
                 <p>
                     {t('finalScore', lang)}: <span style={{ color: 'var(--text-color)', fontSize: '1.5rem' }}>{score}</span>
-                    {score > highScore && <span style={{ color: 'var(--accent-color)', display: 'block', marginTop: '0.5rem' }}>{t('newHighScore', lang)}</span>}
                 </p>
+
+                {/* New High Score Section */}
+                {isNewHighScore && (
+                    <div style={{
+                        margin: '1.5rem 0',
+                        padding: '1.5rem',
+                        background: 'linear-gradient(135deg, rgba(204, 255, 0, 0.1), rgba(255, 215, 0, 0.1))',
+                        border: '2px solid var(--accent-color)',
+                        borderRadius: '12px',
+                        boxShadow: '0 0 30px rgba(204, 255, 0, 0.2)',
+                        textAlign: 'center'
+                    }}>
+                        <h2 style={{
+                            fontSize: '2rem',
+                            color: 'var(--accent-color)',
+                            marginBottom: '0.7rem',
+                            textShadow: '0 0 20px rgba(204, 255, 0, 0.5)'
+                        }}>
+                            {t('newHighScore', lang)} 🎉
+                        </h2>
+                        {playerName && (
+                            <p style={{ color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                                {lang === 'en' ? `Saved as: ${playerName}` : `እንደ: ${playerName} ተመዝግቧል`}
+                            </p>
+                        )}
+                        {pendingSnapshot && (
+                            <div style={{
+                                margin: '1rem auto',
+                                width: '180px',
+                                border: '2px solid var(--accent-color)',
+                                borderRadius: '8px',
+                                overflow: 'hidden',
+                                boxShadow: '0 0 15px rgba(204, 255, 0, 0.2)'
+                            }}>
+                                <img src={pendingSnapshot} alt="High Score" style={{ width: '100%', display: 'block' }} />
+                            </div>
+                        )}
+                        <button
+                            onClick={() => { setIsNewHighScore(false); setShowNameEntry(true); }}
+                            style={{
+                                background: 'transparent',
+                                border: 'none',
+                                color: 'var(--text-muted)',
+                                textDecoration: 'underline',
+                                cursor: 'pointer',
+                                fontSize: '0.9rem',
+                                marginTop: '0.5rem',
+                                fontFamily: 'var(--font-body)'
+                            }}
+                        >
+                            {lang === 'en' ? 'Change Name' : 'ስም ቀይር'}
+                        </button>
+                    </div>
+                )}
+
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', alignItems: 'center' }}>
-                    <MagneticButton onClick={restartGame}>{t('tryAgain', lang)} <RestartIcon /></MagneticButton>
-                    <MagneticButton onClick={turnOffCamera} secondary>{t('turnOffCamera', lang)} <CameraOffIcon /></MagneticButton>
+                    <MagneticButton onClick={() => { setIsNewHighScore(false); restartGame(); }}>{t('tryAgain', lang)} <RestartIcon /></MagneticButton>
+                    <MagneticButton onClick={() => { setIsNewHighScore(false); turnOffCamera(); }} secondary>{t('turnOffCamera', lang)} <CameraOffIcon /></MagneticButton>
                 </div>
             </div>
 
