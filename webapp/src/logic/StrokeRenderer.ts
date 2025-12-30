@@ -87,6 +87,11 @@ export class StrokeRenderer {
         // Update and render particles first (behind trail)
         this.updateAndRenderParticles(ctx, dt);
 
+        // Render environment ambient glow (spreads to surrounding area)
+        if (bladeTrail.length > 1) {
+            this.renderEnvironmentEffect(ctx, bladeTrail, strokeId);
+        }
+
         // Render the main blade trail
         if (bladeTrail.length > 1) {
             switch (strokeId) {
@@ -122,6 +127,144 @@ export class StrokeRenderer {
                     break;
                 default:
                     this.renderClassic(ctx, bladeTrail);
+            }
+        }
+    }
+
+    // Render ambient environment lighting/glow that spreads to the surrounding area
+    private renderEnvironmentEffect(ctx: CanvasRenderingContext2D, trail: BladePoint[], strokeId: StrokeId) {
+        const now = Date.now();
+
+        // Sample points along trail for environment effects
+        for (let i = 0; i < trail.length; i += 2) {
+            const age = (now - trail[i].time) / 400;
+            if (age > 1) continue;
+
+            const alpha = (1 - age) * 0.15;
+            const x = trail[i].x;
+            const y = trail[i].y;
+
+            switch (strokeId) {
+                case 'neon': {
+                    // Neon casts bright magenta/cyan light on surroundings - EXTRA DRAMATIC
+                    const pulse = Math.sin(now * 0.006 + i) * 0.3 + 0.7;
+                    const glowRad = 120 * pulse;
+
+                    // Large outer glow
+                    const gradient2 = ctx.createRadialGradient(x, y, 0, x, y, glowRad);
+                    gradient2.addColorStop(0, `rgba(255, 0, 255, ${alpha * 0.6})`);
+                    gradient2.addColorStop(0.5, `rgba(0, 255, 255, ${alpha * 0.3})`);
+                    gradient2.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                    ctx.fillStyle = gradient2;
+                    ctx.fillRect(x - glowRad, y - glowRad, glowRad * 2, glowRad * 2);
+
+                    // Intense inner light
+                    const gradient = ctx.createRadialGradient(x, y, 0, x, y, glowRad * 0.4);
+                    gradient.addColorStop(0, `rgba(255, 255, 255, ${alpha * 0.8})`);
+                    gradient.addColorStop(0.5, `rgba(255, 0, 255, ${alpha * 0.5})`);
+                    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(x - glowRad * 0.4, y - glowRad * 0.4, glowRad * 0.8, glowRad * 0.8);
+                    break;
+                }
+                case 'fire': {
+                    // Fire casts warm orange/red light, flickering - LARGE WARM GLOW
+                    const flicker = Math.sin(now * 0.01 + i * 0.5) * 0.2 + 0.8;
+                    const glowRad = 100 * flicker;
+                    const gradient = ctx.createRadialGradient(x, y, 0, x, y - 30, glowRad);
+                    gradient.addColorStop(0, `rgba(255, 120, 0, ${alpha * 0.9})`);
+                    gradient.addColorStop(0.3, `rgba(255, 50, 0, ${alpha * 0.5})`);
+                    gradient.addColorStop(0.7, `rgba(180, 30, 0, ${alpha * 0.2})`);
+                    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(x - glowRad, y - glowRad - 30, glowRad * 2, glowRad * 2);
+                    break;
+                }
+                case 'ice': {
+                    // Ice casts cold blue/white light - WIDE FROST AURA
+                    const shimmer = Math.sin(now * 0.004 + i * 0.3) * 0.15 + 0.85;
+                    const glowRad = 90 * shimmer;
+                    const gradient = ctx.createRadialGradient(x, y, 0, x, y, glowRad);
+                    gradient.addColorStop(0, `rgba(220, 250, 255, ${alpha * 0.8})`);
+                    gradient.addColorStop(0.4, `rgba(100, 220, 255, ${alpha * 0.4})`);
+                    gradient.addColorStop(0.8, `rgba(50, 150, 255, ${alpha * 0.1})`);
+                    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(x - glowRad, y - glowRad, glowRad * 2, glowRad * 2);
+                    break;
+                }
+                case 'shadow': {
+                    // Shadow casts dark purple/black anti-light (darkening effect)
+                    const pulse = Math.sin(now * 0.003 + i * 0.4) * 0.1 + 0.9;
+                    const gradient = ctx.createRadialGradient(x, y, 0, x, y, 75 * pulse);
+                    gradient.addColorStop(0, `rgba(30, 0, 50, ${alpha * 0.6})`);
+                    gradient.addColorStop(0.4, `rgba(60, 20, 100, ${alpha * 0.4})`);
+                    gradient.addColorStop(0.7, `rgba(20, 5, 30, ${alpha * 0.2})`);
+                    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(x - 75, y - 75, 150, 150);
+                    break;
+                }
+                case 'electric': {
+                    // Electric casts yellow/blue light with flicker
+                    const spark = Math.random() > 0.7 ? 1.5 : 1;
+                    const gradient = ctx.createRadialGradient(x, y, 0, x, y, 60 * spark);
+                    gradient.addColorStop(0, `rgba(255, 255, 100, ${alpha * 0.7 * spark})`);
+                    gradient.addColorStop(0.3, `rgba(100, 200, 255, ${alpha * 0.4})`);
+                    gradient.addColorStop(0.6, `rgba(50, 100, 200, ${alpha * 0.2})`);
+                    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(x - 60, y - 60, 120, 120);
+                    break;
+                }
+                case 'starfall': {
+                    // Starfall casts purple/gold magical light
+                    const twinkle = Math.sin(now * 0.005 + i * 0.7) * 0.2 + 0.8;
+                    const gradient = ctx.createRadialGradient(x, y, 0, x, y, 55 * twinkle);
+                    gradient.addColorStop(0, `rgba(189, 147, 249, ${alpha * 0.5})`);
+                    gradient.addColorStop(0.4, `rgba(255, 121, 198, ${alpha * 0.3})`);
+                    gradient.addColorStop(0.7, `rgba(241, 250, 140, ${alpha * 0.15})`);
+                    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(x - 55, y - 55, 110, 110);
+                    break;
+                }
+                case 'rainbow': {
+                    // Rainbow casts cycling colored light
+                    const hue = (now * 0.1 + i * 20) % 360;
+                    const gradient = ctx.createRadialGradient(x, y, 0, x, y, 60);
+                    gradient.addColorStop(0, `hsla(${hue}, 100%, 60%, ${alpha * 0.5})`);
+                    gradient.addColorStop(0.5, `hsla(${(hue + 60) % 360}, 100%, 50%, ${alpha * 0.25})`);
+                    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(x - 60, y - 60, 120, 120);
+                    break;
+                }
+                case 'cosmic': {
+                    // Cosmic casts deep blue starlight
+                    const twinkle = Math.sin(now * 0.004 + i) * 0.3 + 0.7;
+                    const gradient = ctx.createRadialGradient(x, y, 0, x, y, 50 * twinkle);
+                    gradient.addColorStop(0, `rgba(100, 120, 200, ${alpha * 0.4})`);
+                    gradient.addColorStop(0.5, `rgba(50, 60, 150, ${alpha * 0.2})`);
+                    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(x - 50, y - 50, 100, 100);
+                    break;
+                }
+                case 'golden': {
+                    // Golden casts warm luxurious light
+                    const shimmer = Math.sin(now * 0.006 + i * 0.5) * 0.2 + 0.8;
+                    const gradient = ctx.createRadialGradient(x, y, 0, x, y, 55 * shimmer);
+                    gradient.addColorStop(0, `rgba(255, 215, 0, ${alpha * 0.5})`);
+                    gradient.addColorStop(0.4, `rgba(255, 180, 50, ${alpha * 0.3})`);
+                    gradient.addColorStop(0.7, `rgba(200, 150, 50, ${alpha * 0.15})`);
+                    gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(x - 55, y - 55, 110, 110);
+                    break;
+                }
+                default:
+                    break;
             }
         }
     }
@@ -665,41 +808,58 @@ export class StrokeRenderer {
                 ctx.fill();
             }
 
-            // Floating ice crystals
+            // Floating ice shards (NOT snowflakes - actual ice fragments)
             if (i % 3 === 0) {
                 ctx.save();
-                ctx.globalAlpha = (1 - age) * 0.8;
-                const crystalDrift = Math.sin(now * 0.004 + i * 0.8) * 8;
-                const crystalFloat = age * 25 + Math.sin(now * 0.006 + i) * 5;
-                ctx.translate(trail[i].x + crystalDrift, trail[i].y - crystalFloat);
-                ctx.rotate(age * Math.PI * 0.3 + i * 0.5);
+                ctx.globalAlpha = (1 - age) * 0.85;
+                const shardDrift = Math.sin(now * 0.004 + i * 0.8) * 10;
+                const shardFall = age * 30;
+                ctx.translate(trail[i].x + shardDrift, trail[i].y + shardFall);
+                ctx.rotate(age * Math.PI * 0.2 + i * 0.7);
 
-                const size = 5 * (1 - age * 0.4);
+                const size = 8 * (1 - age * 0.3);
+                ctx.fillStyle = 'rgba(200, 240, 255, 0.7)';
                 ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 1.5;
-                ctx.shadowBlur = 8;
+                ctx.lineWidth = 1;
+                ctx.shadowBlur = 10;
                 ctx.shadowColor = '#00e5ff';
 
-                // Draw 6-pointed snowflake crystal
-                for (let j = 0; j < 6; j++) {
-                    const angle = (j * Math.PI) / 3;
-                    ctx.beginPath();
-                    ctx.moveTo(0, 0);
-                    const outerX = Math.cos(angle) * size;
-                    const outerY = Math.sin(angle) * size;
-                    ctx.lineTo(outerX, outerY);
-                    // Add branches
-                    if (size > 2) {
-                        const branchSize = size * 0.35;
-                        ctx.moveTo(outerX * 0.6, outerY * 0.6);
-                        ctx.lineTo(outerX * 0.6 + Math.cos(angle + Math.PI / 5) * branchSize,
-                            outerY * 0.6 + Math.sin(angle + Math.PI / 5) * branchSize);
-                        ctx.moveTo(outerX * 0.6, outerY * 0.6);
-                        ctx.lineTo(outerX * 0.6 + Math.cos(angle - Math.PI / 5) * branchSize,
-                            outerY * 0.6 + Math.sin(angle - Math.PI / 5) * branchSize);
-                    }
-                    ctx.stroke();
-                }
+                // Draw ice shard (jagged triangular shape)
+                ctx.beginPath();
+                ctx.moveTo(0, -size);  // Top point
+                ctx.lineTo(size * 0.4, 0);  // Right middle
+                ctx.lineTo(size * 0.2, size * 0.8);  // Right bottom
+                ctx.lineTo(-size * 0.2, size * 0.6);  // Left bottom
+                ctx.lineTo(-size * 0.35, 0);  // Left middle
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.restore();
+            }
+
+            // Smaller ice fragments
+            if (i % 4 === 1) {
+                const fragDrift = Math.cos(now * 0.003 + i) * 6;
+                const fragFall = age * 20;
+                const fragSize = 4 * (1 - age * 0.4);
+
+                ctx.save();
+                ctx.globalAlpha = (1 - age) * 0.6;
+                ctx.translate(trail[i].x + fragDrift, trail[i].y + fragFall);
+                ctx.rotate(now * 0.002 + i);
+
+                // Small ice chip
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                ctx.shadowBlur = 5;
+                ctx.shadowColor = '#00e5ff';
+                ctx.beginPath();
+                ctx.moveTo(0, -fragSize);
+                ctx.lineTo(fragSize * 0.5, fragSize * 0.3);
+                ctx.lineTo(-fragSize * 0.5, fragSize * 0.5);
+                ctx.closePath();
+                ctx.fill();
+
                 ctx.restore();
             }
         }

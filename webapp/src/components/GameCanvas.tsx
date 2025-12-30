@@ -18,6 +18,14 @@ import strokeFireImg from '../assets/stroke_fire_1767089907540.png';
 import strokeIceImg from '../assets/stroke_ice_1767089938190.png';
 import strokeNeonImg from '../assets/stroke_neon_1767089957447.png';
 
+// Theme Backgrounds
+import bgFire from '../assets/bg_fire.png';
+import bgIce from '../assets/bg_ice.png';
+import bgNeon from '../assets/bg_neon.png';
+import bgShadow from '../assets/bg_shadow.png';
+import bgStarfall from '../assets/bg_starfall.png';
+import bgCosmic from '../assets/bg_cosmic.png';
+
 // Map stroke ids to images (some will use fallback colors)
 const STROKE_IMAGES: Record<StrokeId, string | null> = {
     classic: strokeClassicImg,
@@ -30,6 +38,20 @@ const STROKE_IMAGES: Record<StrokeId, string | null> = {
     electric: null,
     cosmic: null,
     golden: null
+};
+
+// Map stroke ids to thematic background images
+const STROKE_BACKGROUNDS: Record<StrokeId, string | null> = {
+    classic: null,
+    starfall: bgStarfall,
+    fire: bgFire,
+    ice: bgIce,
+    neon: bgNeon,
+    shadow: bgShadow,
+    rainbow: bgStarfall, // Use starfall as base for rainbow
+    electric: bgNeon,    // Use neon as base for electric
+    cosmic: bgCosmic,
+    golden: bgFire       // Use fire as base for golden
 };
 
 // --- TYPES ---
@@ -539,7 +561,6 @@ export const GameCanvas: React.FC = () => {
             const globalScoresMap = new Map(globalScores.map(s => [s.name.toLowerCase(), s.score]));
 
             // 2. Load local state
-            const localList = await Persistence.load('leaderboard').then(v => Array.isArray(v) ? v as LeaderboardItem[] : []);
             const playerName = await Persistence.load('playerName').then(v => typeof v === 'string' ? v : '');
 
             // 3. Determine if we should show name entry
@@ -565,65 +586,68 @@ export const GameCanvas: React.FC = () => {
                 }
                 setPendingScore(currentScore);
                 setPendingSnapshot(snapshot);
-                // If user already has a name, don't show modal - just show game over with high score indicator
+
+                // If user already has a name, handle auto-save/sync
                 if (playerName && currentScore > 0) {
-                    // Auto-submit for existing user
-                    setIsNewHighScore(true);
-                    // Auto-save to local and global leaderboards
-                    const existingList = await Persistence.load('leaderboard') || [];
-                    if (Array.isArray(existingList)) {
-                        // Replace existing score for this user
-                        const existingIndex = existingList.findIndex((e: LeaderboardItem) =>
-                            typeof e.name === 'string' && e.name.toLowerCase() === playerName.toLowerCase()
-                        );
-                        let newList;
-                        if (existingIndex >= 0) {
-                            // Only update if new score is higher
-                            if (currentScore > existingList[existingIndex].score) {
-                                existingList[existingIndex] = { name: playerName, score: currentScore, snapshot };
-                            }
-                            newList = [...existingList]
-                                .sort((a, b) => b.score - a.score)
-                                .slice(0, 10)
-                                .map((item, i) => ({ ...item, snapshot: i < 3 ? item.snapshot : undefined }));
-                        } else {
-                            newList = [...existingList, { name: playerName, score: currentScore, snapshot }]
-                                .sort((a, b) => b.score - a.score)
-                                .slice(0, 10)
-                                .map((item, i) => ({ ...item, snapshot: i < 3 ? item.snapshot : undefined }));
-                        }
-                        await Persistence.save('leaderboard', newList);
-                        setLeaderboard(newList as LeaderboardItem[]);
+                    // Celebration ONLY if it's a NEW personal high score
+                    if (isNewLocalHigh) {
+                        setIsNewHighScore(true);
                     }
-                    // Submit to global
-                    try {
-                        await fetch('/api/submit-score', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ name: playerName, score: currentScore, snapshot })
-                        });
-                    } catch { /* silent */ }
-                } else {
+
+                    // 3.1 Update local leaderboard with uniqueness
+                    const existingList = await Persistence.load('leaderboard') as LeaderboardItem[] || [];
+                    const pNameLower = playerName.toLowerCase();
+
+                    // Filter out existing entries for this name and current pending entry
+                    let newList = existingList.filter(e => e.name.toLowerCase() !== pNameLower);
+
+                    // Add current score if it's highest known for this user
+                    const currentBest = Math.max(currentScore, ...existingList.filter(e => e.name.toLowerCase() === pNameLower).map(e => e.score), 0);
+
+                    newList.push({
+                        name: playerName,
+                        score: Math.max(currentScore, currentBest),
+                        snapshot: currentScore >= currentBest ? snapshot : (existingList.find(e => e.name.toLowerCase() === pNameLower)?.snapshot)
+                    });
+
+                    // Sort and trim
+                    newList = newList.sort((a, b) => b.score - a.score).slice(0, 50);
+                    // Snapshot optimization (only top 5)
+                    newList = newList.map((item, i) => ({ ...item, snapshot: i < 5 ? item.snapshot : undefined }));
+
+                    await Persistence.save('leaderboard', newList);
+                    setLeaderboard(newList);
+
+                    // 3.2 Submit to global if it qualifies
+                    if (qualifiesForGlobal) {
+                        try {
+                            await fetch('/api/submit-score', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ name: playerName, score: currentScore, snapshot })
+                            });
+                        } catch { /* silent */ }
+                    }
+                } else if (!playerName) {
                     // No name set, show name entry modal
                     setShowNameEntry(true);
+                    return; // Stop here and wait for user to save via Modal
                 }
-                return;
             }
 
-            // 4. Efficient Auto-sync for ALL qualifying local scores
+            // 4. Batch Auto-sync ALL qualifying local scores that might have been missed
             const syncPromises = [];
-            const processedNames = new Set<string>();
-
-            // Combine local list and current score for evaluation
-            const candidates = [...localList];
+            const processedNamesForSync = new Set<string>();
+            const localListForSync = await Persistence.load('leaderboard') as LeaderboardItem[] || [];
+            const candidates = [...localListForSync];
             if (playerName && currentScore > 0) {
                 candidates.push({ name: playerName, score: currentScore });
             }
 
             for (const item of candidates) {
                 const nameLower = item.name.toLowerCase();
-                if (processedNames.has(nameLower)) continue;
-                processedNames.add(nameLower);
+                if (processedNamesForSync.has(nameLower)) continue;
+                processedNamesForSync.add(nameLower);
 
                 const gScore = globalScoresMap.get(nameLower);
                 const qualifies = item.score > (gScore ?? -1) && (item.score > globalLowest || globalScores.length < 50);
@@ -815,7 +839,7 @@ export const GameCanvas: React.FC = () => {
         if (!name.trim()) return;
         const lowerName = name.trim().toLowerCase();
 
-        const existing = await Persistence.load('leaderboard') || [];
+        const existing = await Persistence.load('leaderboard') as LeaderboardItem[] || [];
         const isExistingUser = playerName && playerName.toLowerCase() === lowerName;
 
         if (!Array.isArray(existing) || (!isExistingUser && existing.some((e: LeaderboardItem) => typeof e.name === 'string' && e.name.toLowerCase() === lowerName))) {
@@ -823,23 +847,32 @@ export const GameCanvas: React.FC = () => {
             return;
         }
 
-        // If existing user is setting a new name, remove their old entry first
-        const existingIndex = existing.findIndex((e: LeaderboardItem) =>
-            typeof e.name === 'string' && e.name.toLowerCase() === playerName.toLowerCase()
-        );
-        let baseList = [...existing];
-        if (isExistingUser && existingIndex >= 0) {
-            // Remove old entry
-            baseList.splice(existingIndex, 1);
+        // If user is changing their name, remove the old one first to prevent duplicates
+        let newList = existing.filter(e => e.name.toLowerCase() !== lowerName);
+        if (playerName && playerName.toLowerCase() !== lowerName) {
+            newList = newList.filter(e => e.name.toLowerCase() !== playerName.toLowerCase());
         }
 
-        const newList = [...baseList, { name: name.trim(), score: pendingScore, snapshot: pendingSnapshot }]
+        newList.push({ name: name.trim(), score: pendingScore, snapshot: pendingSnapshot });
+
+        // Final deduplication (just in case) and sorting
+        const nameMap = new Map<string, LeaderboardItem>();
+        newList.forEach(item => {
+            const low = item.name.toLowerCase();
+            if (!nameMap.has(low) || item.score > (nameMap.get(low)?.score || 0)) {
+                nameMap.set(low, { ...item });
+            }
+        });
+
+        newList = Array.from(nameMap.values())
             .sort((a, b) => b.score - a.score)
-            .slice(0, 10)
-            .map((item, i) => ({
-                ...item,
-                snapshot: i < 3 ? item.snapshot : undefined
-            }));
+            .slice(0, 50);
+
+        // Snapshot optimization
+        newList = newList.map((item, i) => ({
+            ...item,
+            snapshot: i < 5 ? item.snapshot : undefined
+        }));
 
         await Persistence.save('leaderboard', newList);
         await Persistence.save('playerName', name.trim());
@@ -922,8 +955,13 @@ export const GameCanvas: React.FC = () => {
         return () => clearInterval(interval);
     }, [fetchGlobal, gameState, showLeaderboard]);
 
+    const currentBg = STROKE_BACKGROUNDS[currentStroke];
+
     return (
-        <div id="game-container">
+        <div id="game-container" style={{
+            background: currentBg ? `url(${currentBg}) center/cover no-repeat` : undefined,
+            backgroundColor: !currentBg ? (currentStroke === 'shadow' ? '#0a0512' : 'var(--bg-primary)') : undefined
+        }}>
             <canvas ref={canvasRef} id="game-canvas" />
 
             {/* Bottom Controls (Stop Game) */}
