@@ -61,13 +61,45 @@ type TFunction = (key: keyof typeof import('../i18n').translations.en, lang: Lan
 // --- PERSISTENCE HELPER ---
 const Persistence = {
     async save(key: string, value: unknown) {
-        try { await set(key, value); }
-        catch { /* Silently fail */ }
+        // Save to BOTH IndexedDB and LocalStorage for maximum redundancy
+        try {
+            await set(key, value);
+        } catch (e) {
+            console.warn('IDB save failed', e);
+        }
+
+        try {
+            localStorage.setItem(key, JSON.stringify(value));
+        } catch (e) {
+            console.warn('LocalStorage save failed', e);
+        }
     },
     async load(key: string): Promise<unknown> {
-        try { const val = await get(key); if (val !== undefined) return val; } catch { /* Silently fail */ }
-        try { const item = localStorage.getItem(key); return item ? JSON.parse(item) : undefined; } catch { /* Silently fail */ }
-        return undefined;
+        let idbVal: unknown = undefined;
+        let lsVal: unknown = undefined;
+
+        // Try IndexedDB
+        try {
+            idbVal = await get(key);
+        } catch { /* Silent */ }
+
+        // Try LocalStorage
+        try {
+            const item = localStorage.getItem(key);
+            lsVal = item ? JSON.parse(item) : undefined;
+        } catch { /* Silent */ }
+
+        // Use IDB as primary, LS as backup
+        const finalVal = idbVal !== undefined ? idbVal : lsVal;
+
+        // Heal: If one is missing but the other has it, sync them
+        if (idbVal === undefined && lsVal !== undefined) {
+            set(key, lsVal).catch(() => { });
+        } else if (idbVal !== undefined && lsVal === undefined) {
+            try { localStorage.setItem(key, JSON.stringify(idbVal)); } catch { }
+        }
+
+        return finalVal;
     }
 };
 
@@ -694,6 +726,7 @@ export const GameCanvas: React.FC = () => {
     useEffect(() => {
         Persistence.load('playerName').then(v => { if (typeof v === 'string') setPlayerName(v); });
         Persistence.load('leaderboard').then(v => { if (Array.isArray(v)) setLeaderboard(v as LeaderboardItem[]); });
+        Persistence.load('highScore').then(v => { if (typeof v === 'number') setHighScore(v); });
         Persistence.load('selectedStroke').then(v => {
             if (typeof v === 'string' && STROKE_PRESETS.some(s => s.id === v)) {
                 setCurrentStroke(v as StrokeId);
