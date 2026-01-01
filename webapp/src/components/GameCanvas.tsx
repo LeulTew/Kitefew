@@ -594,6 +594,10 @@ export const GameCanvas: React.FC = () => {
     };
 
     const syncLeaderboards = useCallback(async (currentScore: number, isNewLocalHigh: boolean) => {
+        // Load player name safely
+        const savedPlayerName = await Persistence.load('playerName').then(v => typeof v === 'string' ? v : '');
+        const currentEffectiveName = savedPlayerName || 'PLAYER';
+
         // IMMEDIATELY show celebration for new high scores (before any network calls)
         if (isNewLocalHigh && currentScore > 0) {
             // Take snapshot immediately
@@ -614,18 +618,15 @@ export const GameCanvas: React.FC = () => {
             setPendingScore(currentScore);
             setPendingSnapshot(snapshot);
             setIsNewHighScore(true);
+            setPendingOriginalName(currentEffectiveName);
 
-            // Set default playername if not set, and track the ORIGINAL name
-            const savedName = await Persistence.load('playerName').then(v => typeof v === 'string' ? v : '');
-            const originalName = savedName || 'PLAYER';
-            setPendingOriginalName(originalName); // Track original name for comparison when saving
-
-            if (!savedName) {
+            // If no name set, ensure we have a default
+            if (!savedPlayerName) {
                 await Persistence.save('playerName', 'PLAYER');
                 setPlayerName('PLAYER');
             }
 
-            // Don't auto-save - wait for modal close
+            // Don't auto-save - wait for modal close to finalize name and local record
             return;
         }
 
@@ -751,21 +752,33 @@ export const GameCanvas: React.FC = () => {
         }
     }, []);
 
-    const checkHighScore = useCallback(async (final: number) => {
-        const currentHigh = await Persistence.load('highScore').then((val) => typeof val === 'number' ? val : 0);
-        const isNewLocalHigh = final > currentHigh;
+    const checkHighScore = useCallback(async (scoreParam: number) => {
+        try {
+            const final = Number(scoreParam);
+            const rawHigh = await Persistence.load('highScore');
+            let currentHigh = 0;
 
-        if (isNewLocalHigh) {
-            await Persistence.save('highScore', final);
-            setHighScore(final);
+            if (typeof rawHigh === 'number') currentHigh = rawHigh;
+            else if (typeof rawHigh === 'string') currentHigh = parseInt(rawHigh, 10);
+
+            if (isNaN(currentHigh)) currentHigh = 0;
+
+            const isNewLocalHigh = final > currentHigh;
+
+            if (isNewLocalHigh) {
+                await Persistence.save('highScore', final);
+                setHighScore(final);
+            }
+
+            // Trigger sync and celebration - ensure we pass numbers
+            await syncLeaderboards(final, isNewLocalHigh);
+
+            // Refresh local leaderboard display from storage
+            const list = await Persistence.load('leaderboard');
+            if (Array.isArray(list)) setLeaderboard(list as LeaderboardItem[]);
+        } catch (e) {
+            console.error('High score check failed', e);
         }
-
-        // This function handles showing name entry OR auto-syncing
-        await syncLeaderboards(final, isNewLocalHigh);
-
-        // Refresh local leaderboard
-        const list = await Persistence.load('leaderboard');
-        if (Array.isArray(list)) setLeaderboard(list as LeaderboardItem[]);
     }, [syncLeaderboards]);
 
     // Load initial data
@@ -797,15 +810,36 @@ export const GameCanvas: React.FC = () => {
         setMultiplier(newMultiplier);
     }, []);
 
+    // Use refs for callbacks to be used in GameEngine to avoid closure/re-creation issues
+    const checkHighScoreRef = useRef(checkHighScore);
+    const spawnFeedbackRef = useRef(spawnFeedback);
+    const updateStreakRef = useRef(updateStreak);
+
     useEffect(() => {
-        Persistence.load('highScore').then((val) => { if (typeof val === 'number') setHighScore(val); });
+        checkHighScoreRef.current = checkHighScore;
+        spawnFeedbackRef.current = spawnFeedback;
+        updateStreakRef.current = updateStreak;
+    }, [checkHighScore, spawnFeedback, updateStreak]);
+
+    // Cleanup and engine initialization
+    useEffect(() => {
+        let isActive = true;
+        // Pre-load high score
+        Persistence.load('highScore').then((val) => {
+            if (isActive && typeof val === 'number') setHighScore(val);
+        }).catch(() => { });
 
         const engine = new GameEngine(
-            (s) => setScore(s),
-            (l) => setLives(l),
-            (final) => { setGameState('GAMEOVER'); checkHighScore(final); },
-            spawnFeedback,
-            updateStreak
+            (s) => { if (isActive) setScore(s); },
+            (l) => { if (isActive) setLives(l); },
+            (final) => {
+                if (isActive) {
+                    setGameState('GAMEOVER');
+                    checkHighScoreRef.current(final);
+                }
+            },
+            (x, y, text) => { if (isActive) spawnFeedbackRef.current(x, y, text); },
+            (streak, mult) => { if (isActive) updateStreakRef.current(streak, mult); }
         );
         engineRef.current = engine;
 
@@ -813,14 +847,14 @@ export const GameCanvas: React.FC = () => {
         let lastTimestamp: number = 0;
 
         const render = (timestamp: number) => {
+            if (!isActive) return;
             if (!lastTimestamp) lastTimestamp = timestamp;
-            const dt = (timestamp - lastTimestamp) / 16.67; // Normalize to 60fps (16.67ms/frame)
+            const dt = (timestamp - lastTimestamp) / 16.67;
             lastTimestamp = timestamp;
 
             if (canvasRef.current && engineRef.current) {
                 const ctx = canvasRef.current.getContext('2d');
                 if (ctx) {
-                    // Cap dt to avoid massive jumps (like after switching tabs)
                     const cappedDt = Math.min(dt, 5);
                     engineRef.current.loop(ctx, cappedDt);
                 }
@@ -828,13 +862,9 @@ export const GameCanvas: React.FC = () => {
             animationFrameId = requestAnimationFrame(render);
         };
         animationFrameId = requestAnimationFrame(render);
-        setTimeout(() => setGameState('START'), 500);
-        return () => cancelAnimationFrame(animationFrameId);
-    }, [checkHighScore, spawnFeedback, updateStreak]);
 
-    useEffect(() => {
         const handleResize = () => {
-            if (canvasRef.current && engineRef.current) {
+            if (isActive && canvasRef.current && engineRef.current) {
                 canvasRef.current.width = window.innerWidth;
                 canvasRef.current.height = window.innerHeight;
                 engineRef.current.resize(window.innerWidth, window.innerHeight);
@@ -842,7 +872,16 @@ export const GameCanvas: React.FC = () => {
         };
         window.addEventListener('resize', handleResize);
         handleResize();
-        return () => window.removeEventListener('resize', handleResize);
+
+        // Finish loading
+        setTimeout(() => { if (isActive) setGameState('START'); }, 500);
+
+        return () => {
+            isActive = false;
+            cancelAnimationFrame(animationFrameId);
+            window.removeEventListener('resize', handleResize);
+            if (engineRef.current) engineRef.current.gameActive = false;
+        };
     }, []);
 
     // Sync stroke with engine when it changes
