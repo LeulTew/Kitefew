@@ -5,6 +5,7 @@ import type { Results } from '@mediapipe/hands';
 import { get, set } from 'idb-keyval';
 import { t, type Language } from '../i18n';
 import { STROKE_PRESETS, type StrokeId } from '../logic/StrokeTypes';
+import { WelcomeModal } from './WelcomeModal';
 
 // Images - Using static imports for Vite bundling
 import guideGoodFrame from '../assets/guide_good_frame.webp';
@@ -564,10 +565,12 @@ export const GameCanvas: React.FC = () => {
     const [showNameEntry, setShowNameEntry] = useState(false);
     const [pendingScore, setPendingScore] = useState(0);
     const [pendingSnapshot, setPendingSnapshot] = useState<string | undefined>(undefined);
+    const [pendingOriginalName, setPendingOriginalName] = useState<string>(''); // Track original name at high score time
     const [globalLeaderboard, setGlobalLeaderboard] = useState<LeaderboardItem[]>([]);
     const [showLeaderboard, setShowLeaderboard] = useState(false);
     const [isNewHighScore, setIsNewHighScore] = useState(false);
     const [cameraActive, setCameraActive] = useState(false);
+    const [showWelcome, setShowWelcome] = useState(false); // Initial name entry for new users
 
     // Stroke Selection
     const [currentStroke, setCurrentStroke] = useState<StrokeId>('classic');
@@ -591,6 +594,42 @@ export const GameCanvas: React.FC = () => {
     };
 
     const syncLeaderboards = useCallback(async (currentScore: number, isNewLocalHigh: boolean) => {
+        // IMMEDIATELY show celebration for new high scores (before any network calls)
+        if (isNewLocalHigh && currentScore > 0) {
+            // Take snapshot immediately
+            let snapshot: string | undefined = undefined;
+            if (videoRef.current) {
+                try {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    if (ctx) {
+                        canvas.width = videoRef.current.videoWidth;
+                        canvas.height = videoRef.current.videoHeight;
+                        ctx.drawImage(videoRef.current, 0, 0);
+                        snapshot = canvas.toDataURL('image/webp', 0.5);
+                    }
+                } catch { /* ignore */ }
+            }
+
+            setPendingScore(currentScore);
+            setPendingSnapshot(snapshot);
+            setIsNewHighScore(true);
+
+            // Set default playername if not set, and track the ORIGINAL name
+            const savedName = await Persistence.load('playerName').then(v => typeof v === 'string' ? v : '');
+            const originalName = savedName || 'PLAYER';
+            setPendingOriginalName(originalName); // Track original name for comparison when saving
+
+            if (!savedName) {
+                await Persistence.save('playerName', 'PLAYER');
+                setPlayerName('PLAYER');
+            }
+
+            // Don't auto-save - wait for modal close
+            return;
+        }
+
+        // For non-high-scores, do the normal sync
         try {
             // 1. Fetch global state
             const res = await fetch('/api/leaderboard');
@@ -603,7 +642,7 @@ export const GameCanvas: React.FC = () => {
             const globalScoresMap = new Map(globalScores.map(s => [s.name.toLowerCase(), s.score]));
 
             // 2. Load local state
-            const playerName = await Persistence.load('playerName').then(v => typeof v === 'string' ? v : '');
+            const loadedPlayerName = await Persistence.load('playerName').then(v => typeof v === 'string' ? v : '');
 
             // 3. Determine if we should show name entry
             const qualifiesForGlobal = currentScore > globalLowest || globalScores.length < 50;
@@ -613,8 +652,8 @@ export const GameCanvas: React.FC = () => {
                 return;
             }
 
-            // For new high scores or qualifying global scores
-            if (isNewLocalHigh || qualifiesForGlobal) {
+            // For qualifying global scores (but not new local high)
+            if (qualifiesForGlobal) {
                 let snapshot = undefined;
                 if (videoRef.current) {
                     const canvas = document.createElement('canvas');
@@ -630,19 +669,15 @@ export const GameCanvas: React.FC = () => {
                 setPendingSnapshot(snapshot);
 
                 // Auto-save high score with current name (or default "PLAYER")
-                const effectiveName = playerName || 'PLAYER';
-
-                // Show celebration for NEW personal high scores
-                if (isNewLocalHigh && currentScore > 0) {
-                    setIsNewHighScore(true);
-                }
+                const effectiveName = loadedPlayerName || 'PLAYER';
 
                 // If no name was set, save the default
-                if (!playerName) {
+                if (!loadedPlayerName) {
                     await Persistence.save('playerName', effectiveName);
                     setPlayerName(effectiveName);
                 }
 
+                // Auto-save for non-high-scores that qualify for global
                 // 3.1 Update local leaderboard with uniqueness
                 const existingList = await Persistence.load('leaderboard') as LeaderboardItem[] || [];
                 const pNameLower = effectiveName.toLowerCase();
@@ -668,15 +703,13 @@ export const GameCanvas: React.FC = () => {
                 setLeaderboard(newList);
 
                 // 3.2 Submit to global if it qualifies
-                if (qualifiesForGlobal) {
-                    try {
-                        await fetch('/api/submit-score', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ name: effectiveName, score: currentScore, snapshot })
-                        });
-                    } catch { /* silent */ }
-                }
+                try {
+                    await fetch('/api/submit-score', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: effectiveName, score: currentScore, snapshot })
+                    });
+                } catch { /* silent */ }
             }
 
             // 4. Batch Auto-sync ALL qualifying local scores that might have been missed
@@ -737,7 +770,13 @@ export const GameCanvas: React.FC = () => {
 
     // Load initial data
     useEffect(() => {
-        Persistence.load('playerName').then(v => { if (typeof v === 'string') setPlayerName(v); });
+        Persistence.load('playerName').then(v => {
+            if (typeof v === 'string' && v) {
+                setPlayerName(v);
+            } else {
+                setShowWelcome(true);
+            }
+        });
         Persistence.load('leaderboard').then(v => { if (Array.isArray(v)) setLeaderboard(v as LeaderboardItem[]); });
         Persistence.load('highScore').then(v => { if (typeof v === 'number') setHighScore(v); });
         Persistence.load('selectedStroke').then(v => {
@@ -881,76 +920,80 @@ export const GameCanvas: React.FC = () => {
         setLives(3);
     };
 
+    // Save pending high score when user closes the high score modal
+    const savePendingHighScore = async () => {
+        if (!playerName || pendingScore <= 0) return;
+
+        const lowerName = playerName.toLowerCase();
+        const lowerOriginalName = pendingOriginalName.toLowerCase();
+        const nameChanged = lowerName !== lowerOriginalName;
+        const existing = await Persistence.load('leaderboard') as LeaderboardItem[] || [];
+
+        let newList: LeaderboardItem[];
+
+        if (nameChanged) {
+            // Name was changed - DON'T remove the original name's records
+            // Just add the new entry, removing any existing for the NEW name only
+            newList = existing.filter(e => e.name.toLowerCase() !== lowerName);
+
+            // Add entry with the new name
+            newList.push({
+                name: playerName,
+                score: pendingScore,
+                snapshot: pendingSnapshot
+            });
+        } else {
+            // Name is the same - update the existing record
+            newList = existing.filter(e => e.name.toLowerCase() !== lowerName);
+
+            // Get current best for this player
+            const currentBest = Math.max(pendingScore, ...existing.filter(e => e.name.toLowerCase() === lowerName).map(e => e.score), 0);
+
+            newList.push({
+                name: playerName,
+                score: Math.max(pendingScore, currentBest),
+                snapshot: pendingScore >= currentBest ? pendingSnapshot : (existing.find(e => e.name.toLowerCase() === lowerName)?.snapshot)
+            });
+        }
+
+        // Sort and trim
+        newList = newList.sort((a, b) => b.score - a.score).slice(0, 50);
+        // Snapshot optimization (only top 5)
+        newList = newList.map((item, i) => ({ ...item, snapshot: i < 5 ? item.snapshot : undefined }));
+
+        await Persistence.save('leaderboard', newList);
+        setLeaderboard(newList);
+
+        // Submit to global leaderboard
+        try {
+            await fetch('/api/submit-score', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: playerName, score: pendingScore, snapshot: pendingSnapshot })
+            });
+        } catch { /* silent */ }
+    };
+
     const saveScore = async (name: string) => {
         if (!name.trim()) return;
         const lowerName = name.trim().toLowerCase();
-
         const existing = await Persistence.load('leaderboard') as LeaderboardItem[] || [];
         const currentPlayerName = playerName || 'PLAYER';
         const isExistingUser = currentPlayerName.toLowerCase() === lowerName;
-        const isChangingFromDefault = currentPlayerName.toUpperCase() === 'PLAYER' && lowerName !== 'player';
 
         // Allow changing from PLAYER to new name, but reject if name is taken by someone else
         if (!Array.isArray(existing) ||
-            (!isExistingUser && !isChangingFromDefault && existing.some((e: LeaderboardItem) => typeof e.name === 'string' && e.name.toLowerCase() === lowerName))) {
+            (!isExistingUser && currentPlayerName.toUpperCase() !== 'PLAYER' && existing.some((e: LeaderboardItem) => typeof e.name === 'string' && e.name.toLowerCase() === lowerName))) {
             alert(lang === 'en' ? "Name already taken!" : "ስሙ ቀድሞ ተይዟል!");
             return;
         }
 
-        // If user is changing their name, remove the old one first to prevent duplicates
-        let newList = existing.filter(e => e.name.toLowerCase() !== lowerName);
-        if (currentPlayerName.toLowerCase() !== lowerName) {
-            newList = newList.filter(e => e.name.toLowerCase() !== currentPlayerName.toLowerCase());
-        }
-
-        newList.push({ name: name.trim(), score: pendingScore, snapshot: pendingSnapshot });
-
-        // Final deduplication (just in case) and sorting
-        const nameMap = new Map<string, LeaderboardItem>();
-        newList.forEach(item => {
-            const low = item.name.toLowerCase();
-            if (!nameMap.has(low) || item.score > (nameMap.get(low)?.score || 0)) {
-                nameMap.set(low, { ...item });
-            }
-        });
-
-        newList = Array.from(nameMap.values())
-            .sort((a, b) => b.score - a.score)
-            .slice(0, 50);
-
-        // Snapshot optimization
-        newList = newList.map((item, i) => ({
-            ...item,
-            snapshot: i < 5 ? item.snapshot : undefined
-        }));
-
-        await Persistence.save('leaderboard', newList);
+        // Just update the name state and persistence.
+        // We DON'T update the leaderboard or submit to global here.
+        // The savePendingHighScore function (called on close) will handle it.
         await Persistence.save('playerName', name.trim());
-        setLeaderboard(newList);
         setPlayerName(name.trim());
-
-        // Submit to global leaderboard (already checked in submitToGlobalIfQualified, but ensure it's submitted)
-        try {
-            const res = await fetch('/api/submit-score', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: name.trim(), score: pendingScore, snapshot: pendingSnapshot })
-            });
-            if (res.ok) {
-                const result = await res.json();
-                if (!result.success) {
-                    console.warn('Score not in top 50. Keep trying!');
-                } else {
-                    console.log('Score successfully submitted to global leaderboard!');
-                }
-            } else {
-                console.warn('Global leaderboard submission failed (API error)');
-            }
-        } catch {
-            console.warn('Global leaderboard submission failed (network error)');
-        }
         setShowNameEntry(false);
-        setGameState('START');
     };
 
 
@@ -1122,6 +1165,18 @@ export const GameCanvas: React.FC = () => {
             {showNameEntry && <NameEntryModal score={pendingScore} snapshot={pendingSnapshot} onSave={saveScore} onClose={() => setShowNameEntry(false)} lang={lang} initialName={playerName || 'PLAYER'} t={t} />}
 
 
+            {/* Welcome Flow */}
+            {showWelcome && (
+                <WelcomeModal
+                    lang={lang}
+                    onComplete={async (name) => {
+                        await Persistence.save('playerName', name);
+                        setPlayerName(name);
+                        setShowWelcome(false);
+                    }}
+                />
+            )}
+
             {/* Guide */}
             {gameState === 'GUIDE' && <GuideModal onClose={() => setGameState('START')} lang={lang} t={t} />}
 
@@ -1204,8 +1259,8 @@ export const GameCanvas: React.FC = () => {
                 )}
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', alignItems: 'center' }}>
-                    <MagneticButton onClick={() => { setIsNewHighScore(false); restartGame(); }}>{t('tryAgain', lang)} <RestartIcon /></MagneticButton>
-                    <MagneticButton onClick={() => { setIsNewHighScore(false); turnOffCamera(); }} secondary>{t('turnOffCamera', lang)} <CameraOffIcon /></MagneticButton>
+                    <MagneticButton onClick={() => { savePendingHighScore(); setIsNewHighScore(false); restartGame(); }}>{t('tryAgain', lang)} <RestartIcon /></MagneticButton>
+                    <MagneticButton onClick={() => { savePendingHighScore(); setIsNewHighScore(false); turnOffCamera(); }} secondary>{t('turnOffCamera', lang)} <CameraOffIcon /></MagneticButton>
                 </div>
             </div>
 

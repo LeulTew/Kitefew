@@ -135,8 +135,8 @@ export class StrokeRenderer {
     private renderEnvironmentEffect(ctx: CanvasRenderingContext2D, trail: BladePoint[], strokeId: StrokeId) {
         const now = Date.now();
 
-        // Sample points along trail for environment effects
-        for (let i = 0; i < trail.length; i += 2) {
+        // Sample points along trail for environment effects - Step increased for performance
+        for (let i = 0; i < trail.length; i += 6) {
             const age = (now - trail[i].time) / 400;
             if (age > 1) continue;
 
