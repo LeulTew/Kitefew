@@ -252,7 +252,7 @@ const GuideModal: React.FC<{ onClose: () => void; lang: Language; t: TFunction }
 };
 
 // --- NAME ENTRY MODAL ---
-const NameEntryModal: React.FC<{ score: number, snapshot?: string, onSave: (name: string) => void, lang: Language, initialName: string, t: TFunction }> = ({ score, snapshot, onSave, lang, initialName, t }) => {
+const NameEntryModal: React.FC<{ score: number, snapshot?: string, onSave: (name: string) => void, onClose: () => void, lang: Language, initialName: string, t: TFunction }> = ({ score, snapshot, onSave, onClose, lang, initialName, t }) => {
     const [name, setName] = useState(initialName);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -271,11 +271,16 @@ const NameEntryModal: React.FC<{ score: number, snapshot?: string, onSave: (name
 
     return (
         <div className="modal" style={{ zIndex: 110 }}>
-            <h1 style={{ fontSize: '3rem', color: 'var(--accent-color)' }}>{t('newHighScore', lang)}!</h1>
-            <p style={{ marginBottom: '1rem' }}>{t('finalScore', lang)}: {score}</p>
+            <h1 style={{ fontSize: '2.5rem', color: 'var(--accent-color)', marginBottom: '1rem' }}>
+                {lang === 'en' ? 'CHANGE NAME' : 'ስም ቀይር'}
+            </h1>
+            <p style={{ marginBottom: '0.5rem', color: 'var(--text-muted)' }}>
+                {lang === 'en' ? 'Current:' : 'አሁን:'} <strong style={{ color: 'var(--text-color)' }}>{initialName}</strong>
+            </p>
+            <p style={{ marginBottom: '1.5rem' }}>{t('finalScore', lang)}: {score}</p>
 
             {snapshot && (
-                <div style={{ margin: '0 auto 2rem auto', width: '240px', border: '3px solid var(--accent-color)', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 0 20px rgba(204, 255, 0, 0.3)' }}>
+                <div style={{ margin: '0 auto 2rem auto', width: '200px', border: '3px solid var(--accent-color)', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 0 20px rgba(204, 255, 0, 0.3)' }}>
                     <img src={snapshot} alt="High Score Moment" style={{ width: '100%', display: 'block' }} />
                 </div>
             )}
@@ -283,7 +288,7 @@ const NameEntryModal: React.FC<{ score: number, snapshot?: string, onSave: (name
             <div style={{ marginBottom: '2rem' }}>
                 <input
                     type="text"
-                    placeholder={lang === 'en' ? "ENTER NAME" : "ስም ያስገቡ"}
+                    placeholder={lang === 'en' ? "ENTER NEW NAME" : "አዲስ ስም ያስገቡ"}
                     value={name}
                     onChange={(e) => setName(e.target.value.toUpperCase())}
                     onKeyPress={handleKeyPress}
@@ -298,9 +303,14 @@ const NameEntryModal: React.FC<{ score: number, snapshot?: string, onSave: (name
                 />
             </div>
 
-            <MagneticButton onClick={handleSubmit} disabled={isSubmitting}>
-                {isSubmitting ? (lang === 'en' ? 'SUBMITTING...' : 'በመስጠት ላይ...') : t('gotIt', lang)}
-            </MagneticButton>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center' }}>
+                <MagneticButton onClick={handleSubmit} disabled={isSubmitting}>
+                    {isSubmitting ? (lang === 'en' ? 'SAVING...' : 'በመስጠት ላይ...') : (lang === 'en' ? 'SAVE' : 'አስቀምጥ')}
+                </MagneticButton>
+                <MagneticButton onClick={onClose} secondary disabled={isSubmitting}>
+                    {lang === 'en' ? 'CANCEL' : 'ይቅር'}
+                </MagneticButton>
+            </div>
         </div>
     );
 };
@@ -619,51 +629,53 @@ export const GameCanvas: React.FC = () => {
                 setPendingScore(currentScore);
                 setPendingSnapshot(snapshot);
 
-                // If user already has a name, handle auto-save/sync
-                if (playerName && currentScore > 0) {
-                    // Celebration ONLY if it's a NEW personal high score
-                    if (isNewLocalHigh) {
-                        setIsNewHighScore(true);
-                    }
+                // Auto-save high score with current name (or default "PLAYER")
+                const effectiveName = playerName || 'PLAYER';
 
-                    // 3.1 Update local leaderboard with uniqueness
-                    const existingList = await Persistence.load('leaderboard') as LeaderboardItem[] || [];
-                    const pNameLower = playerName.toLowerCase();
+                // Show celebration for NEW personal high scores
+                if (isNewLocalHigh && currentScore > 0) {
+                    setIsNewHighScore(true);
+                }
 
-                    // Filter out existing entries for this name and current pending entry
-                    let newList = existingList.filter(e => e.name.toLowerCase() !== pNameLower);
+                // If no name was set, save the default
+                if (!playerName) {
+                    await Persistence.save('playerName', effectiveName);
+                    setPlayerName(effectiveName);
+                }
 
-                    // Add current score if it's highest known for this user
-                    const currentBest = Math.max(currentScore, ...existingList.filter(e => e.name.toLowerCase() === pNameLower).map(e => e.score), 0);
+                // 3.1 Update local leaderboard with uniqueness
+                const existingList = await Persistence.load('leaderboard') as LeaderboardItem[] || [];
+                const pNameLower = effectiveName.toLowerCase();
 
-                    newList.push({
-                        name: playerName,
-                        score: Math.max(currentScore, currentBest),
-                        snapshot: currentScore >= currentBest ? snapshot : (existingList.find(e => e.name.toLowerCase() === pNameLower)?.snapshot)
-                    });
+                // Filter out existing entries for this name and current pending entry
+                let newList = existingList.filter(e => e.name.toLowerCase() !== pNameLower);
 
-                    // Sort and trim
-                    newList = newList.sort((a, b) => b.score - a.score).slice(0, 50);
-                    // Snapshot optimization (only top 5)
-                    newList = newList.map((item, i) => ({ ...item, snapshot: i < 5 ? item.snapshot : undefined }));
+                // Add current score if it's highest known for this user
+                const currentBest = Math.max(currentScore, ...existingList.filter(e => e.name.toLowerCase() === pNameLower).map(e => e.score), 0);
 
-                    await Persistence.save('leaderboard', newList);
-                    setLeaderboard(newList);
+                newList.push({
+                    name: effectiveName,
+                    score: Math.max(currentScore, currentBest),
+                    snapshot: currentScore >= currentBest ? snapshot : (existingList.find(e => e.name.toLowerCase() === pNameLower)?.snapshot)
+                });
 
-                    // 3.2 Submit to global if it qualifies
-                    if (qualifiesForGlobal) {
-                        try {
-                            await fetch('/api/submit-score', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ name: playerName, score: currentScore, snapshot })
-                            });
-                        } catch { /* silent */ }
-                    }
-                } else if (!playerName) {
-                    // No name set, show name entry modal
-                    setShowNameEntry(true);
-                    return; // Stop here and wait for user to save via Modal
+                // Sort and trim
+                newList = newList.sort((a, b) => b.score - a.score).slice(0, 50);
+                // Snapshot optimization (only top 5)
+                newList = newList.map((item, i) => ({ ...item, snapshot: i < 5 ? item.snapshot : undefined }));
+
+                await Persistence.save('leaderboard', newList);
+                setLeaderboard(newList);
+
+                // 3.2 Submit to global if it qualifies
+                if (qualifiesForGlobal) {
+                    try {
+                        await fetch('/api/submit-score', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ name: effectiveName, score: currentScore, snapshot })
+                        });
+                    } catch { /* silent */ }
                 }
             }
 
@@ -672,8 +684,9 @@ export const GameCanvas: React.FC = () => {
             const processedNamesForSync = new Set<string>();
             const localListForSync = await Persistence.load('leaderboard') as LeaderboardItem[] || [];
             const candidates = [...localListForSync];
-            if (playerName && currentScore > 0) {
-                candidates.push({ name: playerName, score: currentScore });
+            const effectiveNameForSync = playerName || 'PLAYER';
+            if (currentScore > 0) {
+                candidates.push({ name: effectiveNameForSync, score: currentScore });
             }
 
             for (const item of candidates) {
@@ -873,17 +886,21 @@ export const GameCanvas: React.FC = () => {
         const lowerName = name.trim().toLowerCase();
 
         const existing = await Persistence.load('leaderboard') as LeaderboardItem[] || [];
-        const isExistingUser = playerName && playerName.toLowerCase() === lowerName;
+        const currentPlayerName = playerName || 'PLAYER';
+        const isExistingUser = currentPlayerName.toLowerCase() === lowerName;
+        const isChangingFromDefault = currentPlayerName.toUpperCase() === 'PLAYER' && lowerName !== 'player';
 
-        if (!Array.isArray(existing) || (!isExistingUser && existing.some((e: LeaderboardItem) => typeof e.name === 'string' && e.name.toLowerCase() === lowerName))) {
+        // Allow changing from PLAYER to new name, but reject if name is taken by someone else
+        if (!Array.isArray(existing) ||
+            (!isExistingUser && !isChangingFromDefault && existing.some((e: LeaderboardItem) => typeof e.name === 'string' && e.name.toLowerCase() === lowerName))) {
             alert(lang === 'en' ? "Name already taken!" : "ስሙ ቀድሞ ተይዟል!");
             return;
         }
 
         // If user is changing their name, remove the old one first to prevent duplicates
         let newList = existing.filter(e => e.name.toLowerCase() !== lowerName);
-        if (playerName && playerName.toLowerCase() !== lowerName) {
-            newList = newList.filter(e => e.name.toLowerCase() !== playerName.toLowerCase());
+        if (currentPlayerName.toLowerCase() !== lowerName) {
+            newList = newList.filter(e => e.name.toLowerCase() !== currentPlayerName.toLowerCase());
         }
 
         newList.push({ name: name.trim(), score: pendingScore, snapshot: pendingSnapshot });
@@ -1102,7 +1119,7 @@ export const GameCanvas: React.FC = () => {
             {showLeaderboard && <LeaderboardModal data={leaderboard} globalData={globalLeaderboard} onClose={() => setShowLeaderboard(false)} lang={lang} t={t} />}
 
             {/* Name Entry */}
-            {showNameEntry && <NameEntryModal score={pendingScore} snapshot={pendingSnapshot} onSave={saveScore} lang={lang} initialName={playerName} t={t} />}
+            {showNameEntry && <NameEntryModal score={pendingScore} snapshot={pendingSnapshot} onSave={saveScore} onClose={() => setShowNameEntry(false)} lang={lang} initialName={playerName || 'PLAYER'} t={t} />}
 
 
             {/* Guide */}
