@@ -89,6 +89,24 @@ export class GameEngine {
         return (1 - amt) * start + amt * end;
     }
 
+    /**
+     * Calculate shortest distance from point (px, py) to line segment (v to w)
+     */
+    private distToSegment(px: number, py: number, vx: number, vy: number, wx: number, wy: number): number {
+        const l2 = (wx - vx) * (wx - vx) + (wy - vy) * (wy - vy);
+        if (l2 === 0) return Math.hypot(px - vx, py - vy); // v == w
+
+        // Project point onto segment, clamped to [0, 1]
+        let t = ((px - vx) * (wx - vx) + (py - vy) * (wy - vy)) / l2;
+        t = Math.max(0, Math.min(1, t));
+
+        // Find closest point on segment
+        const projX = vx + t * (wx - vx);
+        const projY = vy + t * (wy - vy);
+
+        return Math.hypot(px - projX, py - projY);
+    }
+
     private calculateMultiplier(): number {
         for (let i = CONFIG.streakThresholds.length - 1; i >= 0; i--) {
             if (this.streak >= CONFIG.streakThresholds[i].streak) {
@@ -103,11 +121,21 @@ export class GameEngine {
 
         ctx.clearRect(0, 0, this.width, this.height);
 
-        // 1. Hand Smoothing - scale with dt
+        // 1. Adaptive Smoothing - varies by speed to reduce jitter when still
         if (this.rawHand.visible) {
-            const factor = 1 - Math.pow(1 - CONFIG.smoothingFactor, dt);
-            this.smoothedHand.x = this.lerp(this.smoothedHand.x, this.rawHand.x, factor);
-            this.smoothedHand.y = this.lerp(this.smoothedHand.y, this.rawHand.y, factor);
+            const dx = this.rawHand.x - this.smoothedHand.x;
+            const dy = this.rawHand.y - this.smoothedHand.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            // Normalize: 0 = still, 1 = fast movement (50px+ jump)
+            const speedFactor = Math.min(dist / 50, 1.0);
+
+            // Adaptive: 0.15 when still (heavy smoothing), 0.6 when fast (responsive)
+            const adaptiveFactor = this.lerp(0.15, 0.6, speedFactor);
+            const finalFactor = 1 - Math.pow(1 - adaptiveFactor, dt);
+
+            this.smoothedHand.x = this.lerp(this.smoothedHand.x, this.rawHand.x, finalFactor);
+            this.smoothedHand.y = this.lerp(this.smoothedHand.y, this.rawHand.y, finalFactor);
         }
 
         // 2. Enhanced Blade Trail
@@ -183,24 +211,35 @@ export class GameEngine {
                 continue;
             }
 
-            // Collision Detection with trailing hitbox
+            // Collision Detection with segment-based trailing hitbox
             if (!f.sliced && f.active && this.rawHand.visible) {
                 let sliced = false;
-                const fullHitbox = f.radius + CONFIG.hitboxPadding;
-                const trailingHitbox = f.radius + CONFIG.hitboxPadding * 0.5; // 50% smaller for trailing edge
+                const hitRadius = f.radius + CONFIG.hitboxPadding;
 
-                // Check collision with current tip (full hitbox)
+                // Check collision with current tip
                 const tipDist = Math.hypot(this.smoothedHand.x - f.x, this.smoothedHand.y - f.y);
-                if (tipDist < fullHitbox) {
+                if (tipDist < hitRadius) {
                     sliced = true;
                 }
 
-                // Check collision with trailing point (smaller hitbox)
+                // Check collision with trailing segment (line from tip to previous points)
+                // This only extends BEHIND the tip, not forward
                 if (!sliced && this.bladeTrail.length >= 2) {
-                    const prev = this.bladeTrail[this.bladeTrail.length - 2];
-                    const trailDist = Math.hypot(prev.x - f.x, prev.y - f.y);
-                    if (trailDist < trailingHitbox) {
+                    const tip = this.smoothedHand;
+                    // Check segment from tip to 1st previous point
+                    const prev1 = this.bladeTrail[this.bladeTrail.length - 2];
+                    const segDist1 = this.distToSegment(f.x, f.y, tip.x, tip.y, prev1.x, prev1.y);
+                    if (segDist1 < hitRadius * 0.85) {
                         sliced = true;
+                    }
+
+                    // Check segment from 1st to 2nd previous point (extends further back)
+                    if (!sliced && this.bladeTrail.length >= 3) {
+                        const prev2 = this.bladeTrail[this.bladeTrail.length - 3];
+                        const segDist2 = this.distToSegment(f.x, f.y, prev1.x, prev1.y, prev2.x, prev2.y);
+                        if (segDist2 < hitRadius * 0.7) {
+                            sliced = true;
+                        }
                     }
                 }
 
