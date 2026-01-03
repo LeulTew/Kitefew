@@ -33,8 +33,7 @@ export class MediaPipeService {
             maxNumHands: 1,
             modelComplexity: 1,
             minDetectionConfidence: 0.6,
-            minTrackingConfidence: 0.6,
-            selfieMode: true
+            minTrackingConfidence: 0.6
         });
 
         this.hands.onResults((results) => {
