@@ -78,8 +78,12 @@ export class GameEngine {
     // Hand Tracking with 1€ Filters
     rawHand: HandData = { x: -100, y: -100, visible: false };
     smoothedHand: Point = { x: -100, y: -100 };
-    private filterX: OneEuroFilter = new OneEuroFilter(1.5, 0.01, 1.0);
-    private filterY: OneEuroFilter = new OneEuroFilter(1.5, 0.01, 1.0);
+
+    // One Euro Filter for smoothing
+    // minCutoff: 1.0 (slower = smoother lines, less jitter)
+    // beta: 0.04 (higher = faster response at high speed to avoid lag)
+    private filterX = new OneEuroFilter(1.0, 0.04, 1.0);
+    private filterY = new OneEuroFilter(1.0, 0.04, 1.0);
 
     // Streak & Combo System
     streak: number = 0;

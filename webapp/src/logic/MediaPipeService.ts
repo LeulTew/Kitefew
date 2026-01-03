@@ -32,8 +32,9 @@ export class MediaPipeService {
         this.hands.setOptions({
             maxNumHands: 1,
             modelComplexity: 1,
-            minDetectionConfidence: 0.3, // Lowered for faster initial recognition
-            minTrackingConfidence: 0.3
+            minDetectionConfidence: 0.6,
+            minTrackingConfidence: 0.6,
+            selfieMode: true
         });
 
         this.hands.onResults((results) => {
