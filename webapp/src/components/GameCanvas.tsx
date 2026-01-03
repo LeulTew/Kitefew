@@ -26,6 +26,9 @@ import bgNeon from '../assets/bg_neon.png';
 import bgShadow from '../assets/bg_shadow.png';
 import bgStarfall from '../assets/bg_starfall.png';
 import bgCosmic from '../assets/bg_cosmic.png';
+import bgClassicDark from '../assets/bg_classic_dark.png';
+import bgClassicLight from '../assets/bg_classic_light.png';
+
 
 // Map stroke ids to images (some will use fallback colors)
 const STROKE_IMAGES: Record<StrokeId, string | null> = {
@@ -1087,7 +1090,9 @@ export const GameCanvas: React.FC = () => {
         return () => clearInterval(interval);
     }, [fetchGlobal, gameState, showLeaderboard]);
 
-    const currentBg = STROKE_BACKGROUNDS[currentStroke];
+    const currentBg = currentStroke === 'classic'
+        ? (theme === 'dark' ? bgClassicDark : bgClassicLight)
+        : STROKE_BACKGROUNDS[currentStroke];
 
     return (
         <div id="game-container" style={{
