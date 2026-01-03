@@ -7,7 +7,7 @@ export const CONFIG = {
     bombChance: 0.10,      // 10% bomb
     heartChance: 0.05,     // 5% heart (rarer than bomb)
     doubleFruitChance: 0.12, // 12% double fruit spawn
-    smoothingFactor: 0.45, // Increased for smoother tracking
+    smoothingFactor: 0.35, // Balanced: reduces lag while preventing jitter
     hitboxPadding: 15,
     comboWindowMs: 500,    // 0.5s window for combo detection
     colors: {

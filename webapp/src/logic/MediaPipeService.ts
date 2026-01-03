@@ -14,10 +14,8 @@ export class MediaPipeService {
     onResultsCallback: (results: Results) => void;
     private logger: (msg: string) => void;
 
-    // Tracking state for smoothing
+    // Tracking state
     private lastKnownPosition: { x: number; y: number } | null = null;
-    private velocity: { x: number; y: number } = { x: 0, y: 0 };
-    private lastFrameTime: number = 0;
     public initPromise: Promise<void>;
 
     constructor(videoElement: HTMLVideoElement, onResultsCallback: (results: Results) => void, logger?: (msg: string) => void) {
@@ -33,9 +31,9 @@ export class MediaPipeService {
 
         this.hands.setOptions({
             maxNumHands: 1,
-            modelComplexity: 1, // Increased for better accuracy
-            minDetectionConfidence: 0.4, // Slightly higher for stability
-            minTrackingConfidence: 0.4
+            modelComplexity: 1,
+            minDetectionConfidence: 0.3, // Lowered for faster initial recognition
+            minTrackingConfidence: 0.3
         });
 
         this.hands.onResults((results) => {
@@ -55,35 +53,15 @@ export class MediaPipeService {
     }
 
     /**
-     * Process results with velocity-based smoothing for reduced jitter
+     * Simple result processing - no velocity prediction
      */
     private processResults(results: Results): void {
-        const now = performance.now();
-        const dt = this.lastFrameTime ? (now - this.lastFrameTime) / 1000 : 0.016;
-        this.lastFrameTime = now;
-
         if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
             const hand = results.multiHandLandmarks[0];
             const indexTip = hand[8];
-            const newPos = { x: indexTip.x, y: indexTip.y };
-
-            // Calculate velocity for predictive smoothing
-            if (this.lastKnownPosition) {
-                this.velocity.x = (newPos.x - this.lastKnownPosition.x) / Math.max(dt, 0.016);
-                this.velocity.y = (newPos.y - this.lastKnownPosition.y) / Math.max(dt, 0.016);
-            }
-
-            this.lastKnownPosition = newPos;
-            this.onResultsCallback(results);
-        } else {
-            // Use velocity prediction briefly when hand is lost
-            if (this.lastKnownPosition && dt < 0.1) {
-                // Decay velocity
-                this.velocity.x *= 0.9;
-                this.velocity.y *= 0.9;
-            }
-            this.onResultsCallback(results);
+            this.lastKnownPosition = { x: indexTip.x, y: indexTip.y };
         }
+        this.onResultsCallback(results);
     }
 
 

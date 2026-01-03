@@ -183,13 +183,28 @@ export class GameEngine {
                 continue;
             }
 
-            // Collision Detection
+            // Collision Detection with trailing hitbox
             if (!f.sliced && f.active && this.rawHand.visible) {
-                const dx = this.smoothedHand.x - f.x;
-                const dy = this.smoothedHand.y - f.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
+                let sliced = false;
+                const fullHitbox = f.radius + CONFIG.hitboxPadding;
+                const trailingHitbox = f.radius + CONFIG.hitboxPadding * 0.5; // 50% smaller for trailing edge
 
-                if (dist < f.radius + CONFIG.hitboxPadding) {
+                // Check collision with current tip (full hitbox)
+                const tipDist = Math.hypot(this.smoothedHand.x - f.x, this.smoothedHand.y - f.y);
+                if (tipDist < fullHitbox) {
+                    sliced = true;
+                }
+
+                // Check collision with trailing point (smaller hitbox)
+                if (!sliced && this.bladeTrail.length >= 2) {
+                    const prev = this.bladeTrail[this.bladeTrail.length - 2];
+                    const trailDist = Math.hypot(prev.x - f.x, prev.y - f.y);
+                    if (trailDist < trailingHitbox) {
+                        sliced = true;
+                    }
+                }
+
+                if (sliced) {
                     const prev = this.bladeTrail[this.bladeTrail.length - 2];
                     const moveSpeed = prev ? Math.hypot(this.smoothedHand.x - prev.x, this.smoothedHand.y - prev.y) : 0;
 

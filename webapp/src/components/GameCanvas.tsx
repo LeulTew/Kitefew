@@ -424,6 +424,18 @@ const AboutModal: React.FC<{ onClose: () => void; lang: Language; t: TFunction }
                 </ul>
             </div>
 
+            <p style={{
+                fontStyle: 'italic',
+                color: 'var(--text-muted)',
+                fontSize: '0.95rem',
+                marginBottom: '1.5rem',
+                textAlign: 'center'
+            }}>
+                {lang === 'en'
+                    ? 'May your slices be swift and your combos endless.'
+                    : 'ቅንጥቆችዎ ፈጣን እና ኮምቦዎ ላልቂት ይሁን።'}
+            </p>
+
             <MagneticButton onClick={onClose}>{t('gotIt', lang)}</MagneticButton>
         </div>
     );
