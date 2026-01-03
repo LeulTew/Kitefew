@@ -743,14 +743,18 @@ export const GameCanvas: React.FC = () => {
 
                 // 3.2 Submit to global if it qualifies AND it's NOT a new local high (which needs name confirmation)
                 // If it IS a new local high, we wait for savePendingHighScore to submit it
+                // FIX: Also ensure we only submit if it beats our OWN global best.
                 if (!isNewLocalHigh) {
-                    try {
-                        await fetch('/api/submit-score', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ name: effectiveName, score: currentScore, snapshot })
-                        });
-                    } catch { /* silent */ }
+                    const myGlobalBest = globalScoresMap.get(effectiveName.toLowerCase()) || 0;
+                    if (currentScore > myGlobalBest) {
+                        try {
+                            await fetch('/api/submit-score', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ name: effectiveName, score: currentScore, snapshot })
+                            });
+                        } catch { /* silent */ }
+                    }
                 }
             }
 
@@ -1091,11 +1095,26 @@ export const GameCanvas: React.FC = () => {
 
         // Submit to global leaderboard
         try {
-            await fetch('/api/submit-score', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: playerName, score: pendingScore, snapshot: pendingSnapshot })
-            });
+            // FIX: Check global state before overwriting
+            // Fetch latest global to be sure we aren't overwriting a better score from another device/session
+            let myGlobalBest = 0;
+            try {
+                const res = await fetch('/api/leaderboard');
+                if (res.ok) {
+                    const data = await res.json();
+                    const globalScores: LeaderboardItem[] = data.leaderboard || [];
+                    const myEntry = globalScores.find(s => s.name.toLowerCase() === playerName.toLowerCase());
+                    if (myEntry) myGlobalBest = myEntry.score;
+                }
+            } catch { /* silent */ }
+
+            if (pendingScore > myGlobalBest) {
+                await fetch('/api/submit-score', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: playerName, score: pendingScore, snapshot: pendingSnapshot })
+                });
+            }
         } catch { /* silent */ }
     };
 
