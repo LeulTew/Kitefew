@@ -613,8 +613,9 @@ export const GameCanvas: React.FC = () => {
 
     const syncLeaderboards = useCallback(async (currentScore: number, isNewLocalHigh: boolean) => {
         // Load player name safely
+        // Load player name safely
         const savedPlayerName = await Persistence.load('playerName').then(v => typeof v === 'string' ? v : '');
-        const currentEffectiveName = savedPlayerName || 'PLAYER';
+        const currentEffectiveName = savedPlayerName; // No default 'PLAYER'
 
         // IMMEDIATELY show celebration for new high scores (before any network calls)
         if (isNewLocalHigh && currentScore > 0) {
@@ -736,12 +737,13 @@ export const GameCanvas: React.FC = () => {
             const processedNamesForSync = new Set<string>();
             const localListForSync = await Persistence.load('leaderboard') as LeaderboardItem[] || [];
             const candidates = [...localListForSync];
-            const effectiveNameForSync = playerName || 'PLAYER';
+            const effectiveNameForSync = playerName; // No default 'PLAYER'
             if (currentScore > 0) {
                 candidates.push({ name: effectiveNameForSync, score: currentScore });
             }
 
             for (const item of candidates) {
+                if (!item.name) continue; // Skip if no name
                 const nameLower = item.name.toLowerCase();
                 if (processedNamesForSync.has(nameLower)) continue;
                 processedNamesForSync.add(nameLower);
@@ -914,19 +916,95 @@ export const GameCanvas: React.FC = () => {
     const lastGoodHandRef = useRef<{ x: number; y: number; time: number } | null>(null);
     const TRACKING_GRACE_MS = 150; // Keep blade visible for 150ms after losing track
 
+    // STICKY TRACKING:
+    // 1. If we have a last known position, prefer hands close to it.
+    // 2. If multiple hands, pick the one closest to last position (or center if new).
+    // 3. Ignore "teleportation" jumps unless they persist.
+
+    // Teleportation logic: If jump > 50% screen width, treat as noise initially.
+    const potentialNewHandRef = useRef<{ x: number; y: number; frames: number } | null>(null);
+
     const onResults = useCallback((results: Results) => {
         if (!engineRef.current) return;
         const now = performance.now();
 
+        let bestHand = null;
+
         if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-            setTracking(true);
-            const indexTip = results.multiHandLandmarks[0][8];
+            // Find best hand
+            if (lastGoodHandRef.current && results.multiHandLandmarks.length > 1) {
+                // We have a history, find closest hand
+                let minDist = Infinity;
+                for (const landmarks of results.multiHandLandmarks) {
+                    const tip = landmarks[8];
+                    const hx = (1 - tip.x) * window.innerWidth;
+                    const hy = tip.y * window.innerHeight;
+                    const dist = Math.hypot(hx - lastGoodHandRef.current.x, hy - lastGoodHandRef.current.y);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        bestHand = landmarks;
+                    }
+                }
+            } else {
+                // No history or single hand, take the first one (highest confidence)
+                bestHand = results.multiHandLandmarks[0];
+            }
+        }
+
+        if (bestHand) {
+            const indexTip = bestHand[8];
             const handX = (1 - indexTip.x) * window.innerWidth;
             const handY = indexTip.y * window.innerHeight;
 
-            // Update last known good position
-            lastGoodHandRef.current = { x: handX, y: handY, time: now };
-            engineRef.current.updateHand({ x: handX, y: handY, visible: true });
+            // Teleportation Check
+            let acceptHand = true;
+            if (lastGoodHandRef.current) {
+                const dist = Math.hypot(handX - lastGoodHandRef.current.x, handY - lastGoodHandRef.current.y);
+                const maxJump = window.innerWidth * 0.5; // 50% screen width limit
+
+                if (dist > maxJump) {
+                    // Potential teleport/glitch
+                    if (potentialNewHandRef.current) {
+                        const pDist = Math.hypot(handX - potentialNewHandRef.current.x, handY - potentialNewHandRef.current.y);
+                        if (pDist < 100) { // Stable at new position
+                            potentialNewHandRef.current.frames++;
+                            if (potentialNewHandRef.current.frames > 3) {
+                                acceptHand = true; // Accepted new position after 3 stable frames
+                                potentialNewHandRef.current = null;
+                            } else {
+                                acceptHand = false; // Wait for stability
+                            }
+                        } else {
+                            // Jittering new position, reset
+                            potentialNewHandRef.current = { x: handX, y: handY, frames: 1 };
+                            acceptHand = false;
+                        }
+                    } else {
+                        // First frame of jump
+                        potentialNewHandRef.current = { x: handX, y: handY, frames: 1 };
+                        acceptHand = false;
+                    }
+                } else {
+                    potentialNewHandRef.current = null; // Valid movement, clear potential
+                }
+            } else {
+                potentialNewHandRef.current = null; // First detection ever is always valid
+            }
+
+
+            if (acceptHand) {
+                setTracking(true);
+                // Update last known good position
+                lastGoodHandRef.current = { x: handX, y: handY, time: now };
+                engineRef.current.updateHand({ x: handX, y: handY, visible: true });
+            } else {
+                // Use Grace Period during teleport check
+                const lastGood = lastGoodHandRef.current;
+                if (lastGood && (now - lastGood.time) < TRACKING_GRACE_MS) {
+                    engineRef.current.updateHand({ x: lastGood.x, y: lastGood.y, visible: true });
+                }
+            }
+
         } else {
             // Check if we're within the grace period
             const lastGood = lastGoodHandRef.current;
@@ -936,6 +1014,8 @@ export const GameCanvas: React.FC = () => {
             } else {
                 setTracking(false);
                 engineRef.current.updateHand({ x: -100, y: -100, visible: false });
+                // Reset history on lost tracking
+                // potentialNewHandRef.current = null; // Don't reset potential, might re-acquire
             }
         }
     }, []);
