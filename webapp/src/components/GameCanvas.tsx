@@ -910,15 +910,33 @@ export const GameCanvas: React.FC = () => {
     }, [currentStroke]);
 
 
+    // Track last known good position and time for temporal persistence
+    const lastGoodHandRef = useRef<{ x: number; y: number; time: number } | null>(null);
+    const TRACKING_GRACE_MS = 150; // Keep blade visible for 150ms after losing track
+
     const onResults = useCallback((results: Results) => {
         if (!engineRef.current) return;
+        const now = performance.now();
+
         if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
             setTracking(true);
             const indexTip = results.multiHandLandmarks[0][8];
-            engineRef.current.updateHand({ x: (1 - indexTip.x) * window.innerWidth, y: indexTip.y * window.innerHeight, visible: true });
+            const handX = (1 - indexTip.x) * window.innerWidth;
+            const handY = indexTip.y * window.innerHeight;
+
+            // Update last known good position
+            lastGoodHandRef.current = { x: handX, y: handY, time: now };
+            engineRef.current.updateHand({ x: handX, y: handY, visible: true });
         } else {
-            setTracking(false);
-            engineRef.current.updateHand({ x: -100, y: -100, visible: false });
+            // Check if we're within the grace period
+            const lastGood = lastGoodHandRef.current;
+            if (lastGood && (now - lastGood.time) < TRACKING_GRACE_MS) {
+                // Keep the blade visible at last known position during grace period
+                engineRef.current.updateHand({ x: lastGood.x, y: lastGood.y, visible: true });
+            } else {
+                setTracking(false);
+                engineRef.current.updateHand({ x: -100, y: -100, visible: false });
+            }
         }
     }, []);
 
