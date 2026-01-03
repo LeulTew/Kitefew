@@ -708,11 +708,23 @@ export const GameCanvas: React.FC = () => {
                 // Add current score if it's highest known for this user
                 const currentBest = Math.max(currentScore, ...existingList.filter(e => e.name.toLowerCase() === pNameLower).map(e => e.score), 0);
 
-                newList.push({
-                    name: effectiveName,
-                    score: Math.max(currentScore, currentBest),
-                    snapshot: currentScore >= currentBest ? snapshot : (existingList.find(e => e.name.toLowerCase() === pNameLower)?.snapshot)
-                });
+                // FIX: Only update the list if the current score is actually better than what we have
+                // Or if we don't have an entry yet. NEVER overwrite a high score with a lower one.
+                const shouldUpdate = currentScore >= currentBest;
+
+                if (shouldUpdate) {
+                    newList.push({
+                        name: effectiveName,
+                        score: currentScore,
+                        snapshot: snapshot // Update snapshot only for new high score
+                    });
+                } else {
+                    // Restore the previous best entry if we aren't updating
+                    const previousEntry = existingList.find(e => e.name.toLowerCase() === pNameLower);
+                    if (previousEntry) {
+                        newList.push(previousEntry);
+                    }
+                }
 
                 // Sort and trim
                 newList = newList.sort((a, b) => b.score - a.score).slice(0, 50);

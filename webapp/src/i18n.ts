@@ -32,7 +32,7 @@ export const translations = {
         guideDont: "❌ DON'T: Move Out of Edge",
         guideDontDesc: 'If your finger leaves the frame, tracking stops. Stay within bounds.',
         guideRulesTitle: '⚔️ Gameplay Rules',
-        guideRule1: 'Use Index Finger: Move finger fast to slice!',
+        guideRule1: 'Use Index Finger: Move smooth and slow, no slashing!',
         guideRule2: 'Avoid Bombs: Touching bombs ends the game!',
         guideRule3: 'Collecting Hearts: Heals 1 Life ❤️',
         guideRule4: 'Combos: Slice multiple fruits quickly for massive points!',
