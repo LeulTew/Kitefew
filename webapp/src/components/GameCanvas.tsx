@@ -100,7 +100,7 @@ const Persistence = {
         if (idbVal === undefined && lsVal !== undefined) {
             set(key, lsVal).catch(() => { });
         } else if (idbVal !== undefined && lsVal === undefined) {
-            try { localStorage.setItem(key, JSON.stringify(idbVal)); } catch { }
+            try { localStorage.setItem(key, JSON.stringify(idbVal)); } catch { /* silent */ }
         }
 
         return finalVal;

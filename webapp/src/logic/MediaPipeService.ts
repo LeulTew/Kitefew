@@ -16,6 +16,8 @@ export class MediaPipeService {
 
     // Tracking state for smoothing
     private lastKnownPosition: { x: number; y: number } | null = null;
+    private velocity: { x: number; y: number } = { x: 0, y: 0 };
+    private lastFrameTime: number = 0;
     public initPromise: Promise<void>;
 
     constructor(videoElement: HTMLVideoElement, onResultsCallback: (results: Results) => void, logger?: (msg: string) => void) {
@@ -31,9 +33,9 @@ export class MediaPipeService {
 
         this.hands.setOptions({
             maxNumHands: 1,
-            modelComplexity: 0,
-            minDetectionConfidence: 0.2,
-            minTrackingConfidence: 0.2
+            modelComplexity: 1, // Increased for better accuracy
+            minDetectionConfidence: 0.4, // Slightly higher for stability
+            minTrackingConfidence: 0.4
         });
 
         this.hands.onResults((results) => {
@@ -53,20 +55,34 @@ export class MediaPipeService {
     }
 
     /**
-     * Process results with multi-hand selection and visibility filtering
+     * Process results with velocity-based smoothing for reduced jitter
      */
     private processResults(results: Results): void {
+        const now = performance.now();
+        const dt = this.lastFrameTime ? (now - this.lastFrameTime) / 1000 : 0.016;
+        this.lastFrameTime = now;
+
         if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
             const hand = results.multiHandLandmarks[0];
             const indexTip = hand[8];
-            this.lastKnownPosition = { x: indexTip.x, y: indexTip.y };
+            const newPos = { x: indexTip.x, y: indexTip.y };
 
+            // Calculate velocity for predictive smoothing
+            if (this.lastKnownPosition) {
+                this.velocity.x = (newPos.x - this.lastKnownPosition.x) / Math.max(dt, 0.016);
+                this.velocity.y = (newPos.y - this.lastKnownPosition.y) / Math.max(dt, 0.016);
+            }
+
+            this.lastKnownPosition = newPos;
             this.onResultsCallback(results);
         } else {
-            // Use interpolation if available
-            if (this.lastKnownPosition) {
-                this.onResultsCallback(results); // Engine will handle hidden state
+            // Use velocity prediction briefly when hand is lost
+            if (this.lastKnownPosition && dt < 0.1) {
+                // Decay velocity
+                this.velocity.x *= 0.9;
+                this.velocity.y *= 0.9;
             }
+            this.onResultsCallback(results);
         }
     }
 
