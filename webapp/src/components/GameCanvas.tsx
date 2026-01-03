@@ -323,43 +323,46 @@ const NameEntryModal: React.FC<{ score: number, snapshot?: string, onSave: (name
 
 // --- LEADERBOARD MODAL ---
 const LeaderboardModal: React.FC<{ data: LeaderboardItem[], globalData: LeaderboardItem[], onClose: () => void, lang: Language, t: TFunction }> = ({ data, globalData, onClose, lang, t }) => {
+    // Responsive: stack columns on small screens
+    const isSmallScreen = typeof window !== 'undefined' && window.innerWidth < 500;
+
     return (
-        <div className="modal" style={{ zIndex: 100, maxWidth: '900px', maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
-            <h1 style={{ fontSize: '3rem', marginBottom: '1rem', flexShrink: 0 }}>LEADERBOARD</h1>
+        <div className="modal" style={{ zIndex: 100, maxWidth: isSmallScreen ? '95vw' : '900px', maxHeight: '85vh', display: 'flex', flexDirection: 'column', padding: isSmallScreen ? '1rem' : '2rem' }}>
+            <h1 style={{ fontSize: isSmallScreen ? '2rem' : '3rem', marginBottom: '0.5rem', flexShrink: 0 }}>LEADERBOARD</h1>
 
             <div style={{
                 flexGrow: 1,
                 overflowY: 'auto',
-                margin: '1rem 0',
-                paddingRight: '10px',
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: '30px',
-                minHeight: 0 // Important for nested flex scroll
+                margin: '0.5rem 0',
+                paddingRight: '5px',
+                display: 'flex',
+                flexDirection: isSmallScreen ? 'column' : 'row',
+                gap: isSmallScreen ? '20px' : '30px',
+                minHeight: 0
             }}>
                 {/* Home Leaderboard */}
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem', position: 'sticky', top: 0, background: 'var(--bg-primary)', padding: '10px 0', zIndex: 5 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+                    <h2 style={{ fontSize: isSmallScreen ? '1.1rem' : '1.5rem', marginBottom: '1rem', position: 'sticky', top: 0, background: 'var(--bg-primary)', padding: '5px 0', zIndex: 5 }}>
                         {lang === 'en' ? 'HOME BEST' : 'የቤት ምርጥ'}
                     </h2>
                     {data.length === 0 ? (
-                        <p>{lang === 'en' ? "No scores yet. Be the first!" : "ገና ነጥብ አልተመዘገበም። የመጀመሪያው ይሁኑ!"}</p>
+                        <p style={{ fontSize: isSmallScreen ? '0.85rem' : '1rem' }}>{lang === 'en' ? "No scores yet. Be the first!" : "ገና ነጥብ አልተመዘገበም። የመጀመሪያው ይሁኑ!"}</p>
                     ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: isSmallScreen ? '6px' : '10px' }}>
                             {data.map((item, i) => (
                                 <div key={i} style={{
                                     display: 'flex', alignItems: 'center', background: 'var(--bg-secondary)',
-                                    padding: '10px 20px', borderRadius: '8px', border: i === 0 ? '2px solid var(--accent-color)' : '1px solid var(--border-color)',
-                                    gap: '15px'
+                                    padding: isSmallScreen ? '8px 10px' : '10px 20px', borderRadius: '8px', border: i === 0 ? '2px solid var(--accent-color)' : '1px solid var(--border-color)',
+                                    gap: isSmallScreen ? '8px' : '15px'
                                 }}>
-                                    <span style={{ fontFamily: 'var(--font-heading)', fontSize: '1.5rem', width: '30px', color: i < 3 ? 'var(--accent-color)' : 'var(--text-muted)' }}>{i + 1}</span>
-                                    {item.snapshot && (
+                                    <span style={{ fontFamily: 'var(--font-heading)', fontSize: isSmallScreen ? '1.1rem' : '1.5rem', width: '25px', color: i < 3 ? 'var(--accent-color)' : 'var(--text-muted)' }}>{i + 1}</span>
+                                    {item.snapshot && !isSmallScreen && (
                                         <div style={{ width: '60px', height: '40px', borderRadius: '4px', overflow: 'hidden', flexShrink: 0 }}>
                                             <img src={item.snapshot} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                         </div>
                                     )}
-                                    <span style={{ flexGrow: 1, textAlign: 'left', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</span>
-                                    <span style={{ fontFamily: 'var(--font-heading)', fontSize: '1.2rem', color: 'var(--accent-color)' }}>{item.score}</span>
+                                    <span style={{ flexGrow: 1, textAlign: 'left', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: isSmallScreen ? '0.9rem' : '1rem' }}>{item.name}</span>
+                                    <span style={{ fontFamily: 'var(--font-heading)', fontSize: isSmallScreen ? '1rem' : '1.2rem', color: 'var(--accent-color)' }}>{item.score}</span>
                                 </div>
                             ))}
                         </div>
@@ -367,28 +370,28 @@ const LeaderboardModal: React.FC<{ data: LeaderboardItem[], globalData: Leaderbo
                 </div>
 
                 {/* Global Leaderboard */}
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem', position: 'sticky', top: 0, background: 'var(--bg-primary)', padding: '10px 0', zIndex: 5 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
+                    <h2 style={{ fontSize: isSmallScreen ? '1.1rem' : '1.5rem', marginBottom: '1rem', position: 'sticky', top: 0, background: 'var(--bg-primary)', padding: '5px 0', zIndex: 5 }}>
                         {lang === 'en' ? 'GLOBAL BEST' : 'አለም አቀፍ ምርጥ'}
                     </h2>
                     {globalData.length === 0 ? (
-                        <p>{lang === 'en' ? "Loading..." : "በመስቀል ላይ..."}</p>
+                        <p style={{ fontSize: isSmallScreen ? '0.85rem' : '1rem' }}>{lang === 'en' ? "Loading..." : "በመስቀል ላይ..."}</p>
                     ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: isSmallScreen ? '6px' : '10px' }}>
                             {globalData.map((item, i) => (
                                 <div key={i} style={{
                                     display: 'flex', alignItems: 'center', background: 'var(--bg-secondary)',
-                                    padding: '10px 20px', borderRadius: '8px', border: i === 0 ? '2px solid var(--accent-color)' : '1px solid var(--border-color)',
-                                    gap: '15px'
+                                    padding: isSmallScreen ? '8px 10px' : '10px 20px', borderRadius: '8px', border: i === 0 ? '2px solid var(--accent-color)' : '1px solid var(--border-color)',
+                                    gap: isSmallScreen ? '8px' : '15px'
                                 }}>
-                                    <span style={{ fontFamily: 'var(--font-heading)', fontSize: '1.5rem', width: '30px', color: i < 3 ? 'var(--accent-color)' : 'var(--text-muted)' }}>{i + 1}</span>
-                                    {item.snapshot && (
+                                    <span style={{ fontFamily: 'var(--font-heading)', fontSize: isSmallScreen ? '1.1rem' : '1.5rem', width: '25px', color: i < 3 ? 'var(--accent-color)' : 'var(--text-muted)' }}>{i + 1}</span>
+                                    {item.snapshot && !isSmallScreen && (
                                         <div style={{ width: '60px', height: '40px', borderRadius: '4px', overflow: 'hidden', flexShrink: 0 }}>
                                             <img src={item.snapshot} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                         </div>
                                     )}
-                                    <span style={{ flexGrow: 1, textAlign: 'left', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</span>
-                                    <span style={{ fontFamily: 'var(--font-heading)', fontSize: '1.2rem', color: 'var(--accent-color)' }}>{item.score}</span>
+                                    <span style={{ flexGrow: 1, textAlign: 'left', fontWeight: 'bold', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: isSmallScreen ? '0.9rem' : '1rem' }}>{item.name}</span>
+                                    <span style={{ fontFamily: 'var(--font-heading)', fontSize: isSmallScreen ? '1rem' : '1.2rem', color: 'var(--accent-color)' }}>{item.score}</span>
                                 </div>
                             ))}
                         </div>
@@ -396,7 +399,7 @@ const LeaderboardModal: React.FC<{ data: LeaderboardItem[], globalData: Leaderbo
                 </div>
             </div>
 
-            <div style={{ flexShrink: 0, marginTop: '1rem' }}>
+            <div style={{ flexShrink: 0, marginTop: '0.5rem' }}>
                 <MagneticButton onClick={onClose}>{t('gotIt', lang)}</MagneticButton>
             </div>
         </div>
