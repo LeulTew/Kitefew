@@ -31,7 +31,7 @@ export class MediaPipeService {
 
         this.hands.setOptions({
             maxNumHands: 1,
-            modelComplexity: 1,
+            modelComplexity: 0, // Lite Model for max performance
             minDetectionConfidence: 0.6,
             minTrackingConfidence: 0.6
         });
@@ -69,10 +69,9 @@ export class MediaPipeService {
         await this.initPromise;
         if (this.camera) return;
 
-        // Use a lower resolution for mobile web performance
-        const isMobile = window.innerWidth < 768;
-        const width = isMobile ? 640 : 1280;
-        const height = isMobile ? 480 : 720;
+        // Use 640x480 for ALL devices to ensure consistent 30fps+ performance
+        const width = 640;
+        const height = 480;
 
         this.logger(`MediaPipeService: Starting camera with ${width}x${height}`);
         this.camera = new Camera(this.videoElement, {
