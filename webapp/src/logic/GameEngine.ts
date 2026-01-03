@@ -3,6 +3,62 @@ import { Fruit, Particle, Sparkle, spawnDoubleFruit } from './Entities';
 import { StrokeRenderer } from './StrokeRenderer';
 import type { StrokeId } from './StrokeTypes';
 
+/**
+ * One Euro Filter - Industry standard for responsive, low-latency smoothing
+ * https://cristal.univ-lille.fr/~casiez/1euro/
+ */
+class OneEuroFilter {
+    private minCutoff: number;
+    private beta: number;
+    private dCutoff: number;
+    private xPrev: number = 0;
+    private dxPrev: number = 0;
+    private tPrev: number = 0;
+    private initialized: boolean = false;
+
+    constructor(minCutoff: number = 1.0, beta: number = 0.007, dCutoff: number = 1.0) {
+        this.minCutoff = minCutoff;
+        this.beta = beta;
+        this.dCutoff = dCutoff;
+    }
+
+    private alpha(cutoff: number, dt: number): number {
+        const tau = 1.0 / (2 * Math.PI * cutoff);
+        return 1.0 / (1.0 + tau / dt);
+    }
+
+    filter(x: number, timestamp: number): number {
+        if (!this.initialized) {
+            this.xPrev = x;
+            this.dxPrev = 0;
+            this.tPrev = timestamp;
+            this.initialized = true;
+            return x;
+        }
+
+        const dt = Math.max((timestamp - this.tPrev) / 1000, 0.001); // seconds
+        this.tPrev = timestamp;
+
+        // Estimate derivative (velocity)
+        const dx = (x - this.xPrev) / dt;
+        const edx = this.alpha(this.dCutoff, dt) * dx + (1 - this.alpha(this.dCutoff, dt)) * this.dxPrev;
+        this.dxPrev = edx;
+
+        // Adaptive cutoff: higher speed = higher cutoff = less smoothing
+        const cutoff = this.minCutoff + this.beta * Math.abs(edx);
+
+        // Apply filter
+        const result = this.alpha(cutoff, dt) * x + (1 - this.alpha(cutoff, dt)) * this.xPrev;
+        this.xPrev = result;
+
+        return result;
+    }
+
+    reset() {
+        this.initialized = false;
+    }
+}
+
 export class GameEngine {
     width: number = 0;
     height: number = 0;
@@ -14,14 +70,16 @@ export class GameEngine {
     fruits: Fruit[] = [];
     particles: Particle[] = [];
     sparkles: Sparkle[] = [];
-    bladeTrail: BladePoint[] = [];
+    bladeTrail: BladePoint[] = []
 
     // Stroke Rendering
     private strokeRenderer: StrokeRenderer = new StrokeRenderer();
 
-    // Hand Tracking
+    // Hand Tracking with 1€ Filters
     rawHand: HandData = { x: -100, y: -100, visible: false };
     smoothedHand: Point = { x: -100, y: -100 };
+    private filterX: OneEuroFilter = new OneEuroFilter(1.5, 0.01, 1.0);
+    private filterY: OneEuroFilter = new OneEuroFilter(1.5, 0.01, 1.0);
 
     // Streak & Combo System
     streak: number = 0;
@@ -85,9 +143,7 @@ export class GameEngine {
         this.strokeRenderer.setStroke(strokeId);
     }
 
-    private lerp(start: number, end: number, amt: number) {
-        return (1 - amt) * start + amt * end;
-    }
+
 
     /**
      * Calculate shortest distance from point (px, py) to line segment (v to w)
@@ -121,21 +177,11 @@ export class GameEngine {
 
         ctx.clearRect(0, 0, this.width, this.height);
 
-        // 1. Adaptive Smoothing - varies by speed to reduce jitter when still
+        // 1. One Euro Filter smoothing - industry standard for responsive tracking
         if (this.rawHand.visible) {
-            const dx = this.rawHand.x - this.smoothedHand.x;
-            const dy = this.rawHand.y - this.smoothedHand.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-
-            // Normalize: 0 = still, 1 = fast movement (50px+ jump)
-            const speedFactor = Math.min(dist / 50, 1.0);
-
-            // Adaptive: 0.15 when still (heavy smoothing), 0.6 when fast (responsive)
-            const adaptiveFactor = this.lerp(0.15, 0.6, speedFactor);
-            const finalFactor = 1 - Math.pow(1 - adaptiveFactor, dt);
-
-            this.smoothedHand.x = this.lerp(this.smoothedHand.x, this.rawHand.x, finalFactor);
-            this.smoothedHand.y = this.lerp(this.smoothedHand.y, this.rawHand.y, finalFactor);
+            const now = performance.now();
+            this.smoothedHand.x = this.filterX.filter(this.rawHand.x, now);
+            this.smoothedHand.y = this.filterY.filter(this.rawHand.y, now);
         }
 
         // 2. Enhanced Blade Trail
