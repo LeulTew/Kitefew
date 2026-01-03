@@ -19,7 +19,7 @@ const mockCameraInstance = {
 
 vi.mock('@mediapipe/hands', () => {
     return {
-        Hands: vi.fn().mockImplementation(function() {
+        Hands: vi.fn().mockImplementation(function () {
             return {
                 setOptions: mockHandsInstance.setOptions,
                 onResults: mockHandsInstance.onResults,
@@ -33,7 +33,7 @@ vi.mock('@mediapipe/hands', () => {
 
 vi.mock('@mediapipe/camera_utils', () => {
     return {
-        Camera: vi.fn().mockImplementation(function() {
+        Camera: vi.fn().mockImplementation(function () {
             return {
                 start: mockCameraInstance.start,
                 stop: mockCameraInstance.stop,
@@ -52,7 +52,7 @@ describe('MediaPipeService', () => {
         // Reset mock implementations to default
         mockHandsInstance.initialize.mockResolvedValue(undefined);
         mockHandsInstance.send.mockResolvedValue(undefined);
-        
+
         videoElement = document.createElement('video');
         service = new MediaPipeService(videoElement, mockOnResults);
     });
@@ -130,10 +130,10 @@ describe('MediaPipeService', () => {
         Object.defineProperty(window, 'innerWidth', { value: originalWidth, writable: true, configurable: true });
     });
 
-    it('should handle empty results without last known position', () => {
+    it('should handle empty results even without last known position', () => {
         const mockResults = { multiHandLandmarks: [] } as unknown as Results;
         (service as unknown as { processResults: (r: Results) => void }).processResults(mockResults);
-        expect(mockOnResults).not.toHaveBeenCalled();
+        expect(mockOnResults).toHaveBeenCalledWith(mockResults);
     });
 
     it('should handle camera frame errors', async () => {

@@ -770,7 +770,7 @@ export const GameCanvas: React.FC = () => {
         } catch (e) {
             console.warn('Sync failed', e);
         }
-    }, []);
+    }, [playerName]);
 
     const checkHighScore = useCallback(async (scoreParam: number) => {
         try {
