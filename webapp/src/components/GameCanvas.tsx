@@ -613,14 +613,14 @@ export const GameCanvas: React.FC = () => {
 
     const syncLeaderboards = useCallback(async (currentScore: number, isNewLocalHigh: boolean) => {
         // Load player name safely
-        // Load player name safely
         const savedPlayerName = await Persistence.load('playerName').then(v => typeof v === 'string' ? v : '');
         const currentEffectiveName = savedPlayerName; // No default 'PLAYER'
+
+        let capturedSnapshot: string | undefined = undefined;
 
         // IMMEDIATELY show celebration for new high scores (before any network calls)
         if (isNewLocalHigh && currentScore > 0) {
             // Take snapshot immediately
-            let snapshot: string | undefined = undefined;
             if (videoRef.current) {
                 try {
                     const canvas = document.createElement('canvas');
@@ -629,13 +629,13 @@ export const GameCanvas: React.FC = () => {
                         canvas.width = videoRef.current.videoWidth;
                         canvas.height = videoRef.current.videoHeight;
                         ctx.drawImage(videoRef.current, 0, 0);
-                        snapshot = canvas.toDataURL('image/webp', 0.5);
+                        capturedSnapshot = canvas.toDataURL('image/webp', 0.5);
                     }
                 } catch { /* ignore */ }
             }
 
             setPendingScore(currentScore);
-            setPendingSnapshot(snapshot);
+            setPendingSnapshot(capturedSnapshot);
             setIsNewHighScore(true);
             setPendingOriginalName(currentEffectiveName);
 
@@ -646,7 +646,8 @@ export const GameCanvas: React.FC = () => {
             }
 
             // Don't auto-save - wait for modal close to finalize name and local record
-            return;
+            // FIX: We MUST save locally immediately, otherwise refresh/close loses the record.
+            // We removed the 'return' here to allow fall-through to local saving.
         }
 
         // For non-high-scores, do the normal sync
@@ -675,7 +676,10 @@ export const GameCanvas: React.FC = () => {
             // For qualifying global scores (but not new local high)
             if (qualifiesForGlobal) {
                 let snapshot = undefined;
-                if (videoRef.current) {
+                // If we already captured a snapshot above (new high), use it. otherwise capture.
+                if (isNewLocalHigh && capturedSnapshot) {
+                    snapshot = capturedSnapshot;
+                } else if (videoRef.current) {
                     const canvas = document.createElement('canvas');
                     const ctx = canvas.getContext('2d');
                     if (ctx) {
@@ -685,8 +689,11 @@ export const GameCanvas: React.FC = () => {
                         snapshot = canvas.toDataURL('image/webp', 0.5);
                     }
                 }
-                setPendingScore(currentScore);
-                setPendingSnapshot(snapshot);
+
+                if (!isNewLocalHigh) {
+                    setPendingScore(currentScore);
+                    setPendingSnapshot(snapshot);
+                }
 
                 // Auto-save high score with current name (or default "PLAYER")
                 const effectiveName = loadedPlayerName || 'PLAYER';
@@ -734,14 +741,17 @@ export const GameCanvas: React.FC = () => {
                 await Persistence.save('leaderboard', newList);
                 setLeaderboard(newList);
 
-                // 3.2 Submit to global if it qualifies
-                try {
-                    await fetch('/api/submit-score', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ name: effectiveName, score: currentScore, snapshot })
-                    });
-                } catch { /* silent */ }
+                // 3.2 Submit to global if it qualifies AND it's NOT a new local high (which needs name confirmation)
+                // If it IS a new local high, we wait for savePendingHighScore to submit it
+                if (!isNewLocalHigh) {
+                    try {
+                        await fetch('/api/submit-score', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ name: effectiveName, score: currentScore, snapshot })
+                        });
+                    } catch { /* silent */ }
+                }
             }
 
             // 4. Batch Auto-sync ALL qualifying local scores that might have been missed
