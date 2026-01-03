@@ -433,7 +433,7 @@ const AboutModal: React.FC<{ onClose: () => void; lang: Language; t: TFunction }
             }}>
                 {lang === 'en'
                     ? 'May your slices be swift and your combos endless.'
-                    : 'ቅንጥቆችዎ ፈጣን እና ኮምቦዎ ላልቂት ይሁን።'}
+                    : 'አሰነጣጠቅዎ ፈጣን፣ ኮምቦዎ ማለቂያ የሌለው ይሁን።'}
             </p>
 
             <MagneticButton onClick={onClose}>{t('gotIt', lang)}</MagneticButton>
