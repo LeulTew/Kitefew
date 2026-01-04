@@ -645,9 +645,16 @@ export const GameCanvas: React.FC = () => {
                 setPlayerName('PLAYER');
             }
 
-            // Don't auto-save - wait for modal close to finalize name and local record
-            // FIX: We MUST save locally immediately, otherwise refresh/close loses the record.
-            // We removed the 'return' here to allow fall-through to local saving.
+            // DURABILITY FIX: Save a recovery record so we don't lose the score if the page is refreshed.
+            // IDENTITY FIX: By returning here, we prevent the "immediate save" from overwriting the previous 
+            // user's high score before the current user has a chance to change their name in the modal.
+            await Persistence.save('highScoreRecovery', {
+                score: currentScore,
+                snapshot: capturedSnapshot,
+                originalName: currentEffectiveName
+            });
+
+            return; // RESTORED: Stop here for new high scores. modal will handle the rest.
         }
 
         // For non-high-scores, do the normal sync
@@ -869,6 +876,19 @@ export const GameCanvas: React.FC = () => {
         Persistence.load('selectedStroke').then(v => {
             if (typeof v === 'string' && STROKE_PRESETS.some(s => s.id === v)) {
                 setCurrentStroke(v as StrokeId);
+            }
+        });
+
+        // RECOVERY: Load pending high score if it exists (e.g. from crash or refresh)
+        Persistence.load('highScoreRecovery').then(v => {
+            if (v && typeof v === 'object') {
+                const rec = v as { score: number; snapshot?: string; originalName: string };
+                if (rec.score > 0) {
+                    setPendingScore(rec.score);
+                    setPendingSnapshot(rec.snapshot);
+                    setPendingOriginalName(rec.originalName);
+                    setIsNewHighScore(true);
+                }
             }
         });
     }, []);
@@ -1120,6 +1140,9 @@ export const GameCanvas: React.FC = () => {
 
         await Persistence.save('leaderboard', newList);
         setLeaderboard(newList);
+
+        // CLEAR RECOVERY
+        await Persistence.save('highScoreRecovery', null);
 
         // Submit to global leaderboard
         try {
