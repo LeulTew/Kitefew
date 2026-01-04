@@ -659,6 +659,13 @@ export const GameCanvas: React.FC = () => {
             const globalScores: LeaderboardItem[] = data.leaderboard || [];
             const globalLowest = globalScores.length < 50 ? 0 : (globalScores[globalScores.length - 1]?.score || 0);
 
+            // SAFETY VALVE: If global leaderboard is empty, it's highly suspicious (API error?).
+            // Abort sync to prevent overwriting existing data with local 'garbage'.
+            // Better to fail to submit than to wipe out high scores.
+            if (globalScores.length === 0) {
+                return;
+            }
+
             // O(N) lookup map for efficiency (avoids O(n^2) nested loops)
             const globalScoresMap = new Map(globalScores.map(s => [s.name.toLowerCase(), s.score]));
 
@@ -1103,6 +1110,10 @@ export const GameCanvas: React.FC = () => {
                 if (res.ok) {
                     const data = await res.json();
                     const globalScores: LeaderboardItem[] = data.leaderboard || [];
+
+                    // SAFETY VALVE: If empty, assume error and DO NOT overwrite
+                    if (globalScores.length === 0) return;
+
                     const myEntry = globalScores.find(s => s.name.toLowerCase() === playerName.toLowerCase());
                     if (myEntry) myGlobalBest = myEntry.score;
                 }
