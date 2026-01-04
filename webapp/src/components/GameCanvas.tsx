@@ -59,7 +59,7 @@ const STROKE_BACKGROUNDS: Record<StrokeId, string | null> = {
 };
 
 // --- TYPES ---
-type LeaderboardItem = { name: string; score: number; snapshot?: string };
+type LeaderboardItem = { name: string; score: number; snapshot?: string; lastSyncedScore?: number };
 type TFunction = (key: keyof typeof import('../i18n').translations.en, lang: Language) => string;
 
 // --- PERSISTENCE HELPER ---
@@ -775,16 +775,22 @@ export const GameCanvas: React.FC = () => {
                 candidates.push({ name: effectiveNameForSync, score: currentScore });
             }
 
+            let localListModified = false;
+            const updatedLocalList = [...localListForSync];
+
             for (const item of candidates) {
-                if (!item.name) continue; // Skip if no name
+                if (!item.name || !navigator.onLine) continue; // Skip if no name or offline
                 const nameLower = item.name.toLowerCase();
                 if (processedNamesForSync.has(nameLower)) continue;
                 processedNamesForSync.add(nameLower);
 
                 const gScore = globalScoresMap.get(nameLower);
-                const qualifies = item.score > (gScore ?? -1) && (item.score > globalLowest || globalScores.length < 50);
+                // Check if it qualifies for sync AND hasn't been synced at this score level yet
+                const hasLocalImprovment = item.score > (gScore ?? -1);
+                const isNewToGlobal = (item.score > globalLowest || globalScores.length < 50);
+                const alreadySyncedAtThisLevel = item.lastSyncedScore !== undefined && item.score <= item.lastSyncedScore;
 
-                if (qualifies) {
+                if (hasLocalImprovment && isNewToGlobal && !alreadySyncedAtThisLevel) {
                     syncPromises.push(
                         fetch('/api/submit-score', {
                             method: 'POST',
@@ -794,12 +800,27 @@ export const GameCanvas: React.FC = () => {
                                 score: item.score,
                                 snapshot: item.snapshot
                             })
+                        }).then(async (res) => {
+                            if (res.ok) {
+                                // Mark as synced locally
+                                const idx = updatedLocalList.findIndex(e => e.name.toLowerCase() === nameLower);
+                                if (idx !== -1) {
+                                    updatedLocalList[idx].lastSyncedScore = item.score;
+                                    localListModified = true;
+                                }
+                            }
                         }).catch(() => { })
                     );
                 }
             }
 
-            if (syncPromises.length > 0) await Promise.all(syncPromises);
+            if (syncPromises.length > 0) {
+                await Promise.all(syncPromises);
+                if (localListModified) {
+                    await Persistence.save('leaderboard', updatedLocalList);
+                    setLeaderboard(updatedLocalList);
+                }
+            }
         } catch (e) {
             console.warn('Sync failed', e);
         }
@@ -1194,8 +1215,14 @@ export const GameCanvas: React.FC = () => {
 
         // Poll every 10 seconds for "live" feel
         const interval = setInterval(() => {
-            // Only poll if we are on start screen or leaderboard is open
-            if (gameState === 'START' || showLeaderboard) {
+            // EFFICIENCY: Only poll if:
+            // 1. Tab is visible
+            // 2. We are online
+            // 3. We are on start screen or leaderboard is open
+            const isVisible = document.visibilityState === 'visible';
+            const isOnline = navigator.onLine;
+
+            if (isVisible && isOnline && (gameState === 'START' || showLeaderboard)) {
                 fetchGlobal();
             }
         }, 10000);
