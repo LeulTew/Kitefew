@@ -51,24 +51,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ message: 'Score not in top 50', success: false });
     }
 
-    // Add to leaderboard
+    // CRITICAL: Check if this player already has a higher score
+    // This prevents lower scores from overwriting higher ones
+    const existingScoreStr = await redis.sendCommand(['ZSCORE', 'leaderboard', name]);
+    if (existingScoreStr !== null && typeof existingScoreStr === 'string') {
+      const existingScore = parseFloat(existingScoreStr);
+      if (score <= existingScore) {
+        await redis.disconnect();
+        return res.status(200).json({
+          message: 'Score not higher than existing',
+          success: false,
+          existingScore
+        });
+      }
+    }
+
+    // Add/update leaderboard score (only reaches here if score is higher)
     await redis.sendCommand(['ZADD', 'leaderboard', score.toString(), name]);
-    
+
     // Trim to top 50
     await redis.sendCommand(['ZREMRANGEBYRANK', 'leaderboard', '0', '-51']);
-    
+
     // Get current top 50 to sync data and enforce top-3 snapshot rule
     const currentTop50 = await redis.sendCommand(['ZREVRANGE', 'leaderboard', '0', '49']);
-    
+
     if (Array.isArray(currentTop50)) {
       const toKeep = new Set(currentTop50);
       const allData = await redis.sendCommand(['HGETALL', 'leaderboard:data']);
       let nameHandled = false;
-      
+
       if (Array.isArray(allData)) {
         for (let i = 0; i < allData.length; i += 2) {
           const key = allData[i];
-          const val = allData[i+1];
+          const val = allData[i + 1];
           if (typeof key === 'string' && typeof val === 'string') {
             if (!toKeep.has(key)) {
               await redis.sendCommand(['HDEL', 'leaderboard:data', key]);
@@ -95,12 +110,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           }
         }
       }
-      
+
       if (!nameHandled && toKeep.has(name)) {
         const rank = currentTop50.indexOf(name);
-        await redis.sendCommand(['HSET', 'leaderboard:data', name, JSON.stringify({ 
-          score, 
-          snapshot: (rank !== -1 && rank < 3) ? snapshot : undefined 
+        await redis.sendCommand(['HSET', 'leaderboard:data', name, JSON.stringify({
+          score,
+          snapshot: (rank !== -1 && rank < 3) ? snapshot : undefined
         })]);
       }
     }
