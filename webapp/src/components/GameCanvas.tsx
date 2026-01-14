@@ -330,27 +330,38 @@ const LeaderboardModal: React.FC<{ data: LeaderboardItem[], globalData: Leaderbo
                     )}
                     {/* Clear Local Scores Button */}
                     {data.length > 0 && (
-                        <div style={{ marginTop: '1rem' }}>
+                        <div style={{ marginTop: '1rem', textAlign: 'center' }}>
                             {!showConfirm ? (
                                 <button
                                     onClick={() => setShowConfirm(true)}
                                     style={{
-                                        background: 'transparent',
-                                        border: '1px solid #ff4444',
-                                        color: '#ff4444',
-                                        padding: '6px 12px',
-                                        borderRadius: '4px',
+                                        background: 'var(--bg-secondary)',
+                                        border: '1px solid var(--border-color)',
+                                        color: 'var(--text-muted)',
+                                        padding: '8px 16px',
+                                        borderRadius: '6px',
                                         cursor: 'pointer',
-                                        fontSize: '0.8rem',
-                                        fontFamily: 'var(--font-body)'
+                                        fontSize: '0.75rem',
+                                        fontFamily: 'var(--font-body)',
+                                        transition: 'all 0.2s'
                                     }}
                                 >
-                                    {lang === 'en' ? 'Clear Local Scores' : 'የቤት ነጥቦችን አጥፋ'}
+                                    {lang === 'en' ? '🗑️ Clear Local Scores' : '🗑️ የቤት ነጥቦችን አጥፋ'}
                                 </button>
                             ) : (
-                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                                    <span style={{ fontSize: '0.8rem', color: '#ff4444' }}>
-                                        {lang === 'en' ? 'Are you sure?' : 'እርግጠኛ ነዎት?'}
+                                <div style={{
+                                    display: 'flex',
+                                    gap: '10px',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    flexWrap: 'wrap',
+                                    padding: '8px',
+                                    background: 'rgba(255, 68, 68, 0.1)',
+                                    borderRadius: '6px',
+                                    border: '1px solid rgba(255, 68, 68, 0.3)'
+                                }}>
+                                    <span style={{ fontSize: '0.8rem', color: '#ff6666' }}>
+                                        {lang === 'en' ? 'Clear all local scores?' : 'ሁሉንም የቤት ነጥቦች ይጠፋሉ?'}
                                     </span>
                                     <button
                                         onClick={handleClearLocal}
@@ -358,27 +369,28 @@ const LeaderboardModal: React.FC<{ data: LeaderboardItem[], globalData: Leaderbo
                                             background: '#ff4444',
                                             border: 'none',
                                             color: 'white',
-                                            padding: '4px 10px',
+                                            padding: '6px 14px',
                                             borderRadius: '4px',
                                             cursor: 'pointer',
-                                            fontSize: '0.75rem'
+                                            fontSize: '0.75rem',
+                                            fontWeight: 'bold'
                                         }}
                                     >
-                                        {lang === 'en' ? 'Yes, Clear' : 'አዎ፣ አጥፋ'}
+                                        {lang === 'en' ? 'Yes, Clear' : 'አዎ'}
                                     </button>
                                     <button
                                         onClick={() => setShowConfirm(false)}
                                         style={{
-                                            background: 'transparent',
-                                            border: '1px solid var(--text-muted)',
-                                            color: 'var(--text-muted)',
-                                            padding: '4px 10px',
+                                            background: 'var(--bg-secondary)',
+                                            border: '1px solid var(--border-color)',
+                                            color: 'var(--text-color)',
+                                            padding: '6px 14px',
                                             borderRadius: '4px',
                                             cursor: 'pointer',
                                             fontSize: '0.75rem'
                                         }}
                                     >
-                                        {lang === 'en' ? 'Cancel' : 'ሰርዝ'}
+                                        {lang === 'en' ? 'Cancel' : 'ይቅር'}
                                     </button>
                                 </div>
                             )}

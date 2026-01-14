@@ -223,12 +223,22 @@ export const loadSetting = <T>(key: string) => Persistence.load(key) as Promise<
 // Clear local leaderboard (does NOT affect global leaderboard which is server-side)
 export async function clearLocalLeaderboard(): Promise<void> {
     try {
+        // Clear Dexie tables
         await db.leaderboard.clear();
-        localStorage.removeItem('leaderboard');
-        // Also clear highScore setting
         await db.settings.delete('highScore');
+
+        // Clear localStorage
+        localStorage.removeItem('leaderboard');
         localStorage.removeItem('highScore');
-        console.log('Local leaderboard cleared');
+
+        // CRITICAL: Also clear idb-keyval to prevent old data from migrating back
+        try {
+            const { del } = await import('idb-keyval');
+            await del('leaderboard');
+            await del('highScore');
+        } catch { /* idb-keyval not available */ }
+
+        console.log('Local leaderboard cleared from all storage locations');
     } catch (e) {
         console.warn('Failed to clear local leaderboard:', e);
     }
