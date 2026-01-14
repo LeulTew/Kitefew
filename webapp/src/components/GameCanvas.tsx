@@ -2,10 +2,10 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GameEngine } from '../logic/GameEngine';
 import { MediaPipeService } from '../logic/MediaPipeService';
 import type { Results } from '@mediapipe/hands';
-import { get, set } from 'idb-keyval';
 import { t, type Language } from '../i18n';
 import { STROKE_PRESETS, type StrokeId } from '../logic/StrokeTypes';
 import { WelcomeModal } from './WelcomeModal';
+import { Persistence, migrateFromOldStorage } from '../lib/db';
 
 // Images - Using static imports for Vite bundling
 import guideGoodFrame from '../assets/guide_good_frame.webp';
@@ -61,51 +61,6 @@ const STROKE_BACKGROUNDS: Record<StrokeId, string | null> = {
 // --- TYPES ---
 type LeaderboardItem = { name: string; score: number; snapshot?: string; lastSyncedScore?: number };
 type TFunction = (key: keyof typeof import('../i18n').translations.en, lang: Language) => string;
-
-// --- PERSISTENCE HELPER ---
-const Persistence = {
-    async save(key: string, value: unknown) {
-        // Save to BOTH IndexedDB and LocalStorage for maximum redundancy
-        try {
-            await set(key, value);
-        } catch (e) {
-            console.warn('IDB save failed', e);
-        }
-
-        try {
-            localStorage.setItem(key, JSON.stringify(value));
-        } catch (e) {
-            console.warn('LocalStorage save failed', e);
-        }
-    },
-    async load(key: string): Promise<unknown> {
-        let idbVal: unknown = undefined;
-        let lsVal: unknown = undefined;
-
-        // Try IndexedDB
-        try {
-            idbVal = await get(key);
-        } catch { /* Silent */ }
-
-        // Try LocalStorage
-        try {
-            const item = localStorage.getItem(key);
-            lsVal = item ? JSON.parse(item) : undefined;
-        } catch { /* Silent */ }
-
-        // Use IDB as primary, LS as backup
-        const finalVal = idbVal !== undefined ? idbVal : lsVal;
-
-        // Heal: If one is missing but the other has it, sync them
-        if (idbVal === undefined && lsVal !== undefined) {
-            set(key, lsVal).catch(() => { });
-        } else if (idbVal !== undefined && lsVal === undefined) {
-            try { localStorage.setItem(key, JSON.stringify(idbVal)); } catch { /* silent */ }
-        }
-
-        return finalVal;
-    }
-};
 
 // --- ICONS ---
 const HeartIcon = ({ lost, extra }: { lost: boolean; extra?: boolean }) => (
@@ -598,6 +553,23 @@ export const GameCanvas: React.FC = () => {
     const [theme, setTheme] = useState<'dark' | 'light'>('dark');
     const [lang, setLang] = useState<Language>('en');
 
+    // Mobile image preloading - track which images have successfully loaded
+    const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
+
+    // Preload background images on mount for mobile reliability
+    useEffect(() => {
+        const imagesToPreload = [
+            bgFire, bgIce, bgNeon, bgShadow, bgStarfall, bgCosmic, bgClassicDark, bgClassicLight
+        ];
+        imagesToPreload.forEach(src => {
+            if (!src) return;
+            const img = new Image();
+            img.onload = () => setLoadedImages(prev => new Set([...prev, src]));
+            img.onerror = () => console.warn('Failed to preload image:', src);
+            img.src = src;
+        });
+    }, []);
+
     const toggleTheme = () => {
         const newTheme = theme === 'dark' ? 'light' : 'dark';
         setTheme(newTheme);
@@ -723,37 +695,30 @@ export const GameCanvas: React.FC = () => {
                 const existingList = await Persistence.load('leaderboard') as LeaderboardItem[] || [];
                 const pNameLower = effectiveName.toLowerCase();
 
-                // Filter out existing entries for this name and current pending entry
-                let newList = existingList.filter(e => e.name.toLowerCase() !== pNameLower);
+                // Find existing entry for this player
+                const existingEntry = existingList.find(e => e.name.toLowerCase() === pNameLower);
+                const existingBest = existingEntry?.score ?? 0;
 
-                // Add current score if it's highest known for this user
-                const currentBest = Math.max(currentScore, ...existingList.filter(e => e.name.toLowerCase() === pNameLower).map(e => e.score), 0);
+                // Only update if current score is BETTER than existing
+                if (currentScore > existingBest) {
+                    // Filter out old entry for this name
+                    let newList = existingList.filter(e => e.name.toLowerCase() !== pNameLower);
 
-                // FIX: Only update the list if the current score is actually better than what we have
-                // Or if we don't have an entry yet. NEVER overwrite a high score with a lower one.
-                const shouldUpdate = currentScore >= currentBest;
-
-                if (shouldUpdate) {
+                    // Add new high score entry
                     newList.push({
                         name: effectiveName,
                         score: currentScore,
-                        snapshot: snapshot // Update snapshot only for new high score
+                        snapshot: snapshot
                     });
-                } else {
-                    // Restore the previous best entry if we aren't updating
-                    const previousEntry = existingList.find(e => e.name.toLowerCase() === pNameLower);
-                    if (previousEntry) {
-                        newList.push(previousEntry);
-                    }
+
+                    // Sort and trim
+                    newList = newList.sort((a, b) => b.score - a.score).slice(0, 50);
+                    // Snapshot optimization (only top 5)
+                    newList = newList.map((item, i) => ({ ...item, snapshot: i < 5 ? item.snapshot : undefined }));
+
+                    await Persistence.save('leaderboard', newList);
+                    setLeaderboard(newList);
                 }
-
-                // Sort and trim
-                newList = newList.sort((a, b) => b.score - a.score).slice(0, 50);
-                // Snapshot optimization (only top 5)
-                newList = newList.map((item, i) => ({ ...item, snapshot: i < 5 ? item.snapshot : undefined }));
-
-                await Persistence.save('leaderboard', newList);
-                setLeaderboard(newList);
 
                 // 3.2 Submit to global if it qualifies AND it's NOT a new local high (which needs name confirmation)
                 // If it IS a new local high, we wait for savePendingHighScore to submit it
@@ -864,6 +829,9 @@ export const GameCanvas: React.FC = () => {
 
     // Load initial data
     useEffect(() => {
+        // Run migration from old storage (idb-keyval) to new Dexie database
+        migrateFromOldStorage();
+
         Persistence.load('playerName').then(v => {
             if (typeof v === 'string' && v) {
                 setPlayerName(v);
@@ -1109,28 +1077,40 @@ export const GameCanvas: React.FC = () => {
         let newList: LeaderboardItem[];
 
         if (nameChanged) {
-            // Name was changed - DON'T remove the original name's records
-            // Just add the new entry, removing any existing for the NEW name only
-            newList = existing.filter(e => e.name.toLowerCase() !== lowerName);
+            // Name was changed - check if pending score beats existing score for NEW name
+            const existingNewNameEntry = existing.find(e => e.name.toLowerCase() === lowerName);
+            const newNameBest = existingNewNameEntry?.score ?? 0;
 
-            // Add entry with the new name
-            newList.push({
-                name: playerName,
-                score: pendingScore,
-                snapshot: pendingSnapshot
-            });
+            // Only update if pending score is BETTER than existing for new name
+            if (pendingScore > newNameBest) {
+                // Remove old entry for new name, add new entry
+                newList = existing.filter(e => e.name.toLowerCase() !== lowerName);
+                newList.push({
+                    name: playerName,
+                    score: pendingScore,
+                    snapshot: pendingSnapshot
+                });
+            } else {
+                // Keep existing entry for new name (it's better)
+                newList = existing;
+            }
         } else {
-            // Name is the same - update the existing record
-            newList = existing.filter(e => e.name.toLowerCase() !== lowerName);
+            // Name is the same - update only if better
+            const existingEntry = existing.find(e => e.name.toLowerCase() === lowerName);
+            const currentBest = existingEntry?.score ?? 0;
 
-            // Get current best for this player
-            const currentBest = Math.max(pendingScore, ...existing.filter(e => e.name.toLowerCase() === lowerName).map(e => e.score), 0);
-
-            newList.push({
-                name: playerName,
-                score: Math.max(pendingScore, currentBest),
-                snapshot: pendingScore >= currentBest ? pendingSnapshot : (existing.find(e => e.name.toLowerCase() === lowerName)?.snapshot)
-            });
+            if (pendingScore > currentBest) {
+                // New high score - update entry
+                newList = existing.filter(e => e.name.toLowerCase() !== lowerName);
+                newList.push({
+                    name: playerName,
+                    score: pendingScore,
+                    snapshot: pendingSnapshot
+                });
+            } else {
+                // Keep existing (it's better or equal)
+                newList = existing;
+            }
         }
 
         // Sort and trim
@@ -1257,10 +1237,13 @@ export const GameCanvas: React.FC = () => {
         ? (theme === 'dark' ? bgClassicDark : bgClassicLight)
         : STROKE_BACKGROUNDS[currentStroke];
 
+    // Only use background if it's successfully preloaded (mobile reliability fix)
+    const bgReady = currentBg && loadedImages.has(currentBg);
+
     return (
         <div id="game-container" style={{
-            background: currentBg ? `url(${currentBg}) center/cover no-repeat` : undefined,
-            backgroundColor: !currentBg ? (currentStroke === 'shadow' ? '#0a0512' : 'var(--bg-primary)') : undefined
+            background: bgReady ? `url(${currentBg}) center/cover no-repeat` : undefined,
+            backgroundColor: !bgReady ? (currentStroke === 'shadow' ? '#0a0512' : 'var(--bg-primary)') : undefined
         }}>
             <canvas ref={canvasRef} id="game-canvas" />
 
