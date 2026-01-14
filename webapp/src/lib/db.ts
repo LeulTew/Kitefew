@@ -220,6 +220,20 @@ export async function markSynced(name: string, syncedScore: number): Promise<voi
 export const saveSetting = (key: string, value: unknown) => Persistence.save(key, value);
 export const loadSetting = <T>(key: string) => Persistence.load(key) as Promise<T | undefined>;
 
+// Clear local leaderboard (does NOT affect global leaderboard which is server-side)
+export async function clearLocalLeaderboard(): Promise<void> {
+    try {
+        await db.leaderboard.clear();
+        localStorage.removeItem('leaderboard');
+        // Also clear highScore setting
+        await db.settings.delete('highScore');
+        localStorage.removeItem('highScore');
+        console.log('Local leaderboard cleared');
+    } catch (e) {
+        console.warn('Failed to clear local leaderboard:', e);
+    }
+}
+
 // Migration function (called on app init)
 export async function migrateFromOldStorage(): Promise<void> {
     // The load functions already handle migration from idb-keyval and localStorage
@@ -232,3 +246,4 @@ export async function migrateFromOldStorage(): Promise<void> {
         console.warn('Migration check failed:', e);
     }
 }
+

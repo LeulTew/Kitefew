@@ -5,7 +5,7 @@ import type { Results } from '@mediapipe/hands';
 import { t, type Language } from '../i18n';
 import { STROKE_PRESETS, type StrokeId } from '../logic/StrokeTypes';
 import { WelcomeModal } from './WelcomeModal';
-import { Persistence, migrateFromOldStorage } from '../lib/db';
+import { Persistence, migrateFromOldStorage, clearLocalLeaderboard } from '../lib/db';
 
 // Images - Using static imports for Vite bundling
 import guideGoodFrame from '../assets/guide_good_frame.webp';
@@ -277,9 +277,15 @@ const NameEntryModal: React.FC<{ score: number, snapshot?: string, onSave: (name
 
 
 // --- LEADERBOARD MODAL ---
-const LeaderboardModal: React.FC<{ data: LeaderboardItem[], globalData: LeaderboardItem[], onClose: () => void, lang: Language, t: TFunction }> = ({ data, globalData, onClose, lang, t }) => {
+const LeaderboardModal: React.FC<{ data: LeaderboardItem[], globalData: LeaderboardItem[], onClose: () => void, onClearLocal: () => void, lang: Language, t: TFunction }> = ({ data, globalData, onClose, onClearLocal, lang, t }) => {
     // Responsive: stack columns on small screens
     const isSmallScreen = typeof window !== 'undefined' && window.innerWidth < 500;
+    const [showConfirm, setShowConfirm] = React.useState(false);
+
+    const handleClearLocal = () => {
+        onClearLocal();
+        setShowConfirm(false);
+    };
 
     return (
         <div className="modal" style={{ zIndex: 100, maxWidth: isSmallScreen ? '95vw' : '900px', maxHeight: '85vh', display: 'flex', flexDirection: 'column', padding: isSmallScreen ? '1rem' : '2rem' }}>
@@ -320,6 +326,62 @@ const LeaderboardModal: React.FC<{ data: LeaderboardItem[], globalData: Leaderbo
                                     <span style={{ fontFamily: 'var(--font-heading)', fontSize: isSmallScreen ? '1rem' : '1.2rem', color: 'var(--accent-color)' }}>{item.score}</span>
                                 </div>
                             ))}
+                        </div>
+                    )}
+                    {/* Clear Local Scores Button */}
+                    {data.length > 0 && (
+                        <div style={{ marginTop: '1rem' }}>
+                            {!showConfirm ? (
+                                <button
+                                    onClick={() => setShowConfirm(true)}
+                                    style={{
+                                        background: 'transparent',
+                                        border: '1px solid #ff4444',
+                                        color: '#ff4444',
+                                        padding: '6px 12px',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer',
+                                        fontSize: '0.8rem',
+                                        fontFamily: 'var(--font-body)'
+                                    }}
+                                >
+                                    {lang === 'en' ? 'Clear Local Scores' : 'የቤት ነጥቦችን አጥፋ'}
+                                </button>
+                            ) : (
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                    <span style={{ fontSize: '0.8rem', color: '#ff4444' }}>
+                                        {lang === 'en' ? 'Are you sure?' : 'እርግጠኛ ነዎት?'}
+                                    </span>
+                                    <button
+                                        onClick={handleClearLocal}
+                                        style={{
+                                            background: '#ff4444',
+                                            border: 'none',
+                                            color: 'white',
+                                            padding: '4px 10px',
+                                            borderRadius: '4px',
+                                            cursor: 'pointer',
+                                            fontSize: '0.75rem'
+                                        }}
+                                    >
+                                        {lang === 'en' ? 'Yes, Clear' : 'አዎ፣ አጥፋ'}
+                                    </button>
+                                    <button
+                                        onClick={() => setShowConfirm(false)}
+                                        style={{
+                                            background: 'transparent',
+                                            border: '1px solid var(--text-muted)',
+                                            color: 'var(--text-muted)',
+                                            padding: '4px 10px',
+                                            borderRadius: '4px',
+                                            cursor: 'pointer',
+                                            fontSize: '0.75rem'
+                                        }}
+                                    >
+                                        {lang === 'en' ? 'Cancel' : 'ሰርዝ'}
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
@@ -1349,7 +1411,7 @@ export const GameCanvas: React.FC = () => {
             </div>
 
             {/* Leaderboard */}
-            {showLeaderboard && <LeaderboardModal data={leaderboard} globalData={globalLeaderboard} onClose={() => setShowLeaderboard(false)} lang={lang} t={t} />}
+            {showLeaderboard && <LeaderboardModal data={leaderboard} globalData={globalLeaderboard} onClose={() => setShowLeaderboard(false)} onClearLocal={async () => { await clearLocalLeaderboard(); setLeaderboard([]); setHighScore(0); }} lang={lang} t={t} />}
 
             {/* Name Entry */}
             {showNameEntry && <NameEntryModal score={pendingScore} snapshot={pendingSnapshot} onSave={saveScore} onClose={() => setShowNameEntry(false)} lang={lang} initialName={playerName || 'PLAYER'} t={t} />}
