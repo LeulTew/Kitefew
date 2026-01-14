@@ -862,9 +862,34 @@ export const GameCanvas: React.FC = () => {
 
             if (syncPromises.length > 0) {
                 await Promise.all(syncPromises);
+
+                // SENIOR DEV FIX: Prevent race condition where background sync overwrites concurrent changes (like Clear or new games)
                 if (localListModified) {
-                    await Persistence.save('leaderboard', updatedLocalList);
-                    setLeaderboard(updatedLocalList);
+                    // Re-read current fresh state from DB
+                    const currentList = await Persistence.load('leaderboard') as LeaderboardItem[] || [];
+
+                    // If DB was cleared (empty), abort updates to deleted items
+                    if (currentList.length === 0) return;
+
+                    // Apply the 'lastSyncedScore' updates to the FRESH list non-destructively
+                    let changesApplied = false;
+                    for (const syncedItem of updatedLocalList) {
+                        // Find matching item in fresh list by name and score
+                        const target = currentList.find(c =>
+                            c.name.toLowerCase() === syncedItem.name.toLowerCase() &&
+                            c.score === syncedItem.score
+                        );
+
+                        if (target && target.lastSyncedScore !== syncedItem.lastSyncedScore) {
+                            target.lastSyncedScore = syncedItem.lastSyncedScore;
+                            changesApplied = true;
+                        }
+                    }
+
+                    if (changesApplied) {
+                        await Persistence.save('leaderboard', currentList);
+                        setLeaderboard(currentList);
+                    }
                 }
             }
         } catch (e) {
